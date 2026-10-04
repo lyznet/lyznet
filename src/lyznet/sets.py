@@ -5,6 +5,7 @@ import math
 from numbers import Integral
 
 import numpy as np
+import sympy as sp
 
 
 def _finite_points(points, dimension):
@@ -187,4 +188,56 @@ class SublevelSet:
         return self.certificate.value(points) <= self.level
 
 
-__all__ = ["Box", "EuclideanBall", "SublevelSet", "WholeSpace"]
+@dataclass(frozen=True)
+class RestrictedSublevelSet:
+    """``D intersect {h_i<=1} intersect {V<=c}``.
+
+    The restrictions are part of the certified set, rather than metadata on
+    an otherwise unconstrained sublevel.
+    """
+
+    certificate: object
+    level: float
+    domain: Box
+    states: tuple
+    state_constraints: tuple = ()
+
+    def __post_init__(self):
+        basic = SublevelSet(self.certificate, self.level)
+        states = tuple(self.states)
+        constraints = tuple(
+            sp.sympify(expression) for expression in self.state_constraints
+        )
+        if len(states) != self.domain.dimension:
+            raise ValueError("states and domain must have the same dimension.")
+        undeclared = set().union(
+            *(expression.free_symbols for expression in constraints)
+        ).difference(states)
+        if undeclared:
+            raise ValueError("state constraints contain undeclared symbols.")
+        object.__setattr__(self, "level", basic.level)
+        object.__setattr__(self, "states", states)
+        object.__setattr__(self, "state_constraints", constraints)
+
+    def contains(self, points):
+        values = _finite_points(points, self.domain.dimension)
+        contained = self.domain.contains(values)
+        contained &= self.certificate.value(values) <= self.level
+        if self.state_constraints:
+            flat = values.reshape(-1, self.domain.dimension)
+            for expression in self.state_constraints:
+                function = sp.lambdify(self.states, expression, modules="numpy")
+                constraint_values = np.asarray(function(*flat.T), dtype=float)
+                if constraint_values.ndim == 0:
+                    constraint_values = np.full(len(flat), constraint_values)
+                contained &= constraint_values.reshape(values.shape[:-1]) <= 1
+        return contained
+
+
+__all__ = [
+    "Box",
+    "EuclideanBall",
+    "RestrictedSublevelSet",
+    "SublevelSet",
+    "WholeSpace",
+]

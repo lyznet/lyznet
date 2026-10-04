@@ -4,6 +4,7 @@ from pathlib import Path
 from time import perf_counter
 
 from .analysis import quadratic_lyapunov
+from .constraints import normalise_state_constraints, normalise_viable_faces
 from .neural_assessment import screen_neural_lyapunov
 from .neural_learning import (
     effort_configuration,
@@ -32,6 +33,8 @@ def find_neural_lyapunov(
     verifier_verbose,
     plot,
     plot_options,
+    state_constraints,
+    viable_faces,
 ):
     """Run the four explicit stages of the neural Lyapunov workflow."""
 
@@ -49,6 +52,10 @@ def find_neural_lyapunov(
     verification_options = (
         {} if verification_options is None else dict(verification_options)
     )
+    state_constraints = normalise_state_constraints(
+        system, state_constraints
+    )
+    viable_faces = normalise_viable_faces(system, viable_faces)
     result_directory = Path(results_dir).expanduser().resolve()
     total_started = perf_counter()
 
@@ -96,6 +103,7 @@ def find_neural_lyapunov(
         seed=data_options.pop("seed", seed),
         overwrite=data_overwrite,
         verbose=learner_verbose,
+        state_constraints=state_constraints,
         **data_options,
     )
 
@@ -123,6 +131,7 @@ def find_neural_lyapunov(
         ),
         overwrite=model_overwrite,
         verbose=learner_verbose,
+        state_constraints=state_constraints,
         **learner_options,
     )
     candidate_time = perf_counter() - candidate_started
@@ -130,6 +139,15 @@ def find_neural_lyapunov(
     # Stage 4a: empirical proposal. The result explicitly remains nonformal.
     if verifier_verbose:
         print("\n--- Empirical screening ---")
+    state_constraint_band = verification_options.pop(
+        "state_constraint_band", 1e-3
+    )
+    state_constraint_viability_margin = verification_options.pop(
+        "state_constraint_viability_margin", 1e-5
+    )
+    face_viability_margin = verification_options.pop(
+        "face_viability_margin", 1e-5
+    )
     screening = screen_neural_lyapunov(
         system,
         training.candidate,
@@ -139,6 +157,13 @@ def find_neural_lyapunov(
         device=verification_options.pop("screening_device", device),
         precision=verification_options.pop("search_precision", 1e-4),
         proof_margin=verification_options.get("crown_proof_margin", 1e-6),
+        state_constraints=state_constraints,
+        viable_faces=viable_faces,
+        state_constraint_band=state_constraint_band,
+        state_constraint_viability_margin=(
+            state_constraint_viability_margin
+        ),
+        face_viability_margin=face_viability_margin,
     )
     if verifier_verbose:
         print(
@@ -155,8 +180,17 @@ def find_neural_lyapunov(
     verification = None
     verification_time = 0.0
     if verify == "crown":
+        crown_device = verification_options.pop("crown_device", device)
         if verifier_verbose:
             print("\n--- Formal CROWN verification ---")
+            import torch
+
+            from .verification._crown import normalise_device
+
+            print(
+                "  device: {}"
+                .format(normalise_device(torch, crown_device))
+            )
         verification_started = perf_counter()
         verification = verify_neural_lyapunov_crown(
             system,
@@ -165,8 +199,15 @@ def find_neural_lyapunov(
             local_level=screening.local_level,
             outer_level=screening.outer_level,
             assessment=screening,
+            state_constraints=state_constraints,
+            viable_faces=viable_faces,
+            state_constraint_band=state_constraint_band,
+            state_constraint_viability_margin=(
+                state_constraint_viability_margin
+            ),
+            face_viability_margin=face_viability_margin,
             timeout=verification_options.pop("crown_timeout", None),
-            device=verification_options.pop("crown_device", device),
+            device=crown_device,
             batch_size=verification_options.pop("crown_batch_size", 64),
             proof_margin=verification_options.pop(
                 "crown_proof_margin", 1e-6
@@ -191,6 +232,8 @@ def find_neural_lyapunov(
         assessment=screening,
         data_path=data.path,
         model_path=training.model_path,
+        state_constraints=state_constraints,
+        viable_faces=viable_faces,
     )
     if verifier_verbose:
         status = "not run" if verification is None else verification.status.value

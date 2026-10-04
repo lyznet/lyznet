@@ -88,6 +88,53 @@ def _system_configuration(system):
     }
 
 
+def _constraint_configuration(state_constraints):
+    return [sp.srepr(sp.sympify(value)) for value in state_constraints]
+
+
+def _admissible_sobol(
+    system, state_constraints, count, seed, torch_device
+):
+    """Draw a deterministic Sobol prefix inside every ``h_i<=1``."""
+
+    engine = torch.quasirandom.SobolEngine(
+        system.state_dimension, scramble=True, seed=int(seed)
+    )
+    lower = torch.tensor(
+        system.domain.lower, dtype=torch.float32, device=torch_device
+    )
+    upper = torch.tensor(
+        system.domain.upper, dtype=torch.float32, device=torch_device
+    )
+    constraint_graph = (
+        expression_graph(torch, system.states, state_constraints).to(
+            torch_device
+        )
+        if state_constraints
+        else None
+    )
+    accepted = []
+    accepted_count = 0
+    for _ in range(100):
+        unit = engine.draw(max(256, count), dtype=torch.float32).to(
+            torch_device
+        )
+        points = lower + unit * (upper - lower)
+        if constraint_graph is not None:
+            with torch.no_grad():
+                admissible = torch.all(
+                    constraint_graph(points) <= 1, dim=1
+                )
+            points = points[admissible]
+        accepted.append(points)
+        accepted_count += len(points)
+        if accepted_count >= count:
+            return torch.cat(accepted)[:count]
+    raise RuntimeError(
+        "Could not draw enough states satisfying all h_i<=1 constraints."
+    )
+
+
 def _result_directory(path):
     directory = Path(path).expanduser().resolve()
     directory.mkdir(parents=True, exist_ok=True)
@@ -114,6 +161,7 @@ def generate_trajectory_data(
     max_time=30.0,
     transform_mu=0.1,
     convergence_radius=1e-3,
+    state_constraints=(),
     overwrite=False,
     verbose=False,
 ):
@@ -135,6 +183,9 @@ def generate_trajectory_data(
     if step_size <= 0 or max_time <= 0 or transform_mu <= 0:
         raise ValueError("step_size, max_time, and transform_mu must be positive.")
     torch_device = normalise_device(torch, device)
+    state_constraints = tuple(
+        sp.sympify(value) for value in state_constraints
+    )
     configuration = {
         "kind": "trajectory-data-v1",
         "system": _system_configuration(system),
@@ -144,6 +195,7 @@ def generate_trajectory_data(
         "max_time": float(max_time),
         "transform_mu": float(transform_mu),
         "convergence_radius": float(convergence_radius),
+        "state_constraints": _constraint_configuration(state_constraints),
     }
     fingerprint = _configuration_fingerprint(configuration)
     path = _result_directory(results_dir) / (
@@ -167,17 +219,19 @@ def generate_trajectory_data(
         return result
 
     dtype = torch.float32
-    engine = torch.quasirandom.SobolEngine(
-        system.state_dimension, scramble=True, seed=int(seed)
-    )
-    unit = engine.draw(int(sample_count), dtype=dtype).to(torch_device)
     lower = torch.tensor(
         system.domain.lower, dtype=dtype, device=torch_device
     )
     upper = torch.tensor(
         system.domain.upper, dtype=dtype, device=torch_device
     )
-    initial = lower + unit * (upper - lower)
+    initial = _admissible_sobol(
+        system,
+        state_constraints,
+        int(sample_count),
+        seed,
+        torch_device,
+    )
     centre = torch.tensor(
         tuple(map(float, system.equilibrium)),
         dtype=dtype,
@@ -192,6 +246,13 @@ def generate_trajectory_data(
     dynamics = expression_graph(
         torch, system.states, tuple(system.symbolic.dynamics)
     ).to(torch_device)
+    constraint_graph = (
+        expression_graph(torch, system.states, state_constraints).to(
+            torch_device
+        )
+        if state_constraints
+        else None
+    )
     steps = int(np.ceil(max_time / step_size))
     if verbose:
         print(
@@ -214,6 +275,10 @@ def generate_trajectory_data(
             inside = torch.all(
                 (states >= lower) & (states <= upper), dim=1
             )
+            if constraint_graph is not None:
+                inside &= torch.all(
+                    constraint_graph(states) <= 1, dim=1
+                )
             near = torch.linalg.vector_norm(states - centre, dim=1) <= (
                 convergence_radius
             )
@@ -299,6 +364,7 @@ def train_neural_lyapunov(
     batch_size=512,
     transform_mu=0.1,
     anchor_scale=0.25,
+    state_constraints=(),
     overwrite=False,
     verbose=False,
 ):
@@ -307,6 +373,9 @@ def train_neural_lyapunov(
     if architecture not in ("plain", "anchored"):
         raise ValueError("architecture must be 'plain' or 'anchored'.")
     torch_device = normalise_device(torch, device)
+    state_constraints = tuple(
+        sp.sympify(value) for value in state_constraints
+    )
     configuration = {
         "kind": "neural-lyapunov-v1",
         "system": _system_configuration(system),
@@ -321,6 +390,7 @@ def train_neural_lyapunov(
         "batch_size": int(batch_size),
         "transform_mu": float(transform_mu),
         "anchor_scale": float(anchor_scale),
+        "state_constraints": _constraint_configuration(state_constraints),
         "matrix": np.asarray(quadratic.matrix, dtype=float).tolist(),
     }
     fingerprint = _configuration_fingerprint(configuration)
@@ -363,19 +433,13 @@ def train_neural_lyapunov(
             dtype=torch.float32,
             device=torch_device,
         )
-        lower = torch.tensor(
-            system.domain.lower, dtype=torch.float32, device=torch_device
+        collocation = _admissible_sobol(
+            system,
+            state_constraints,
+            int(collocation_points),
+            int(seed) + 1,
+            torch_device,
         )
-        upper = torch.tensor(
-            system.domain.upper, dtype=torch.float32, device=torch_device
-        )
-        sobol = torch.quasirandom.SobolEngine(
-            system.state_dimension, scramble=True, seed=int(seed) + 1
-        )
-        collocation = sobol.draw(
-            int(collocation_points), dtype=torch.float32
-        ).to(torch_device)
-        collocation = lower + collocation * (upper - lower)
         dynamics = expression_graph(
             torch, system.states, tuple(system.symbolic.dynamics)
         ).to(torch_device)

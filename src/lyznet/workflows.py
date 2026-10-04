@@ -45,6 +45,8 @@ class LyapunovSearchResult:
     assessment: object | None = None
     data_path: object | None = None
     model_path: object | None = None
+    state_constraints: tuple = ()
+    viable_faces: tuple = ()
 
     @property
     def is_verified(self):
@@ -109,8 +111,15 @@ def find_lyapunov(
     verifier_verbose=False,
     plot=False,
     plot_options=None,
+    state_constraints=(),
+    viable_faces=(),
 ):
-    """Construct a Lyapunov candidate and optionally verify it formally."""
+    """Construct a Lyapunov candidate and optionally verify it formally.
+
+    Neural state constraints use ``h_i(x) <= 1``. A viable box face is named
+    by a zero-based coordinate and ``"lower"`` or ``"upper"``; every other
+    face must remain separated from the verified sublevel.
+    """
 
     if family == "neural":
         if scope != "roa":
@@ -136,6 +145,13 @@ def find_lyapunov(
             verifier_verbose=verifier_verbose,
             plot=plot,
             plot_options=plot_options,
+            state_constraints=state_constraints,
+            viable_faces=viable_faces,
+        )
+    if state_constraints or viable_faces:
+        raise ValueError(
+            "State constraints and viable faces currently require "
+            "family='neural'."
         )
     if family not in ("quadratic", "polynomial"):
         raise ValueError(

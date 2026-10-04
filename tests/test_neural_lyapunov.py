@@ -72,6 +72,21 @@ def test_trajectory_data_uses_a_deterministic_fingerprint(tmp_path):
     assert first.path.exists()
 
 
+def test_trajectory_data_samples_only_the_admissible_set(tmp_path):
+    state = stable_linear_system().states[0]
+    data = generate_trajectory_data(
+        stable_linear_system(),
+        sample_count=32,
+        results_dir=tmp_path,
+        device="cpu",
+        max_time=0.02,
+        step_size=0.02,
+        state_constraints=(4 * state**2,),
+    )
+
+    assert np.all(4 * data.states[:, 0] ** 2 <= 1 + 1e-6)
+
+
 def test_training_reuses_only_the_matching_checkpoint(tmp_path):
     system = stable_linear_system()
     quadratic = lz.quadratic_lyapunov(system)
@@ -176,3 +191,61 @@ def test_neural_crown_reports_the_two_stage_claim(monkeypatch):
     assert result.claim is lz.VerificationClaim.STABLE_EQUILIBRIUM_ROA
     assert result.verified_level == pytest.approx(0.02)
 
+
+def test_neural_crown_proves_constraints_and_selected_viable_faces(
+    monkeypatch,
+):
+    names = []
+
+    class FakeRunner:
+        def __init__(self, **kwargs):
+            pass
+
+        def solve(self, name, model, output_dimension, condition, bounds):
+            names.append(name)
+            return lz.VerificationObligation(
+                name=name,
+                status=lz.VerificationStatus.VERIFIED,
+                elapsed_time=0.0,
+                backend_status="verified",
+            )
+
+    system = stable_linear_system()
+    state = system.states[0]
+    quadratic = lz.quadratic_lyapunov(system)
+    quadratic_set = lz.SublevelSet(quadratic, 0.1)
+    bootstrap = lz.QuadraticVerificationResult(
+        system=system,
+        certificate=quadratic,
+        claim=lz.VerificationClaim.LYAPUNOV,
+        status=lz.VerificationStatus.VERIFIED,
+        local_set=quadratic_set,
+        verified_set=quadratic_set,
+        obligations=(),
+        backend="test",
+        elapsed_time=0.0,
+    )
+    candidate = QuadraticAnchoredNeuralLyapunov(
+        TanhNetwork(1, hidden_layers=1, width=3),
+        (0.0,),
+        quadratic.matrix,
+    )
+    monkeypatch.setattr(adapter, "load_crown", lambda: (torch, object()))
+    monkeypatch.setattr(adapter, "normalise_device", lambda *args: "cpu")
+    monkeypatch.setattr(adapter, "CrownRunner", FakeRunner)
+
+    result = adapter.verify_neural_lyapunov_crown(
+        system,
+        candidate,
+        bootstrap,
+        local_level=0.01,
+        outer_level=0.02,
+        state_constraints=(4 * state**2,),
+        viable_faces=((0, "lower"), (0, "upper")),
+    )
+
+    assert result.is_verified
+    assert isinstance(result.verified_set, lz.RestrictedSublevelSet)
+    assert "neural_state_constraint_1_viability" in names
+    assert "neural_boundary_x1_lower" in names
+    assert "neural_boundary_x1_upper" in names

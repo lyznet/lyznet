@@ -20,22 +20,7 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M11 — Viability-aware state constraints
-
-Status: in progress
-
-Objective: allow intersections of smooth state constraints to form part of a
-formally verified neural region through strict inward-pointing conditions.
-
-Acceptance criteria:
-
-- Constraints use the explicit convention ``h_i(x) <= 1``.
-- Decrease is proved only on the admissible constrained annulus.
-- Every active constraint boundary has a visible strict Nagumo condition.
-- Selected box faces may use the same viability argument; other faces remain
-  separated from the verified sublevel.
-- A constrained two-dimensional example screens, verifies, and plots through
-  the public workflow.
+M07--M11 are complete and awaiting review. M12 has not started.
 
 ## Queue
 
@@ -173,4 +158,23 @@ Validation:
   (`6 passed`).
 - `vdp_mu_1.py`: trained in the low effort setting, screened levels `0.2073`
   and `0.7158`, formally `VERIFIED` by CROWN, and saved its plot.
+- `git diff --check`.
+
+### M11 — Viability-aware state constraints
+
+Added the admissible-set convention ``K=intersection_i {h_i<=1}`` to neural
+data generation, collocation sampling, empirical screening, formal proof, and
+plotting. The CROWN core visibly proves decrease only in ``K``, strict Nagumo
+conditions near every active ``h_i=1`` boundary, and either separation or
+strict inward flow on each box face. Formal results now represent the actual
+restricted set ``D intersect K intersect {W<=c}``.
+
+Validation:
+
+- Base environment: `.venv/bin/python -m pytest -q`
+  (`89 passed, 3 skipped`).
+- Complete CROWN environment: `python -m pytest -q` (`99 passed`).
+- `linear_disk.py`: screened local/outer levels `0.0455` and `0.9`, formally
+  `VERIFIED` the state constraint and all four viable faces, estimated
+  constrained volume `3.80444`, and saved the masked constraint plot.
 - `git diff --check`.

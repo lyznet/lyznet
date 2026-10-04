@@ -111,3 +111,19 @@ def test_sublevel_set_uses_the_candidate_value_function():
     )
     with pytest.raises(ValueError, match="positive and finite"):
         lz.SublevelSet(Candidate(), 0.0)
+
+
+def test_restricted_sublevel_intersects_all_defining_sets():
+    x1, x2 = sp.symbols("x1 x2")
+    candidate = lz.PolynomialLyapunov((x1, x2), x1**2 + x2**2)
+    region = lz.RestrictedSublevelSet(
+        candidate,
+        2.0,
+        lz.Box(((-1.0, 1.0), (-1.0, 1.0))),
+        (x1, x2),
+        (4 * x1**2 + x2**2,),
+    )
+
+    assert region.contains(np.asarray([0.25, 0.25]))
+    assert not region.contains(np.asarray([0.75, 0.0]))
+    assert not region.contains(np.asarray([0.0, 1.1]))

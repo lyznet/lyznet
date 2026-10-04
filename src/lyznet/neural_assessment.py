@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_FLOOR
 
 import numpy as np
+import sympy as sp
 import torch
 
 from .verification._crown import expression_graph, normalise_device
@@ -19,6 +20,7 @@ class NeuralScreeningResult:
     containment_limit: float
     decrease_limit: float | None
     boundary_limit: float
+    constraint_limit: float | None
     estimated_volume: float
     sample_count: int
     seed: int
@@ -68,18 +70,6 @@ def _box_samples(torch_device, bounds, count, seed):
     return lower + points * (upper - lower)
 
 
-def _boundary_samples(torch_device, bounds, per_face, seed):
-    faces = []
-    for coordinate in range(len(bounds)):
-        for side in bounds[coordinate]:
-            points = _box_samples(
-                torch_device, bounds, per_face, seed + len(faces) + 1
-            )
-            points[:, coordinate] = float(side)
-            faces.append(points)
-    return torch.cat(faces)
-
-
 def screen_neural_lyapunov(
     system,
     candidate,
@@ -91,6 +81,11 @@ def screen_neural_lyapunov(
     precision=1e-4,
     proof_margin=1e-6,
     batch_size=4096,
+    state_constraints=(),
+    viable_faces=(),
+    state_constraint_band=1e-3,
+    state_constraint_viability_margin=1e-5,
+    face_viability_margin=1e-5,
 ):
     """Sample the same containment, decrease, and boundary predicates.
 
@@ -101,6 +96,10 @@ def screen_neural_lyapunov(
     if sample_count < 256:
         raise ValueError("sample_count must be at least 256.")
     torch_device = normalise_device(torch, device)
+    state_constraints = tuple(
+        sp.sympify(value) for value in state_constraints
+    )
+    viable_faces = set(viable_faces)
     model = deepcopy(candidate).to(torch_device).eval()
     bounds = system.domain.bounds
     points = _box_samples(torch_device, bounds, sample_count, seed)
@@ -126,6 +125,18 @@ def screen_neural_lyapunov(
         quadratic_values = torch.sum(
             (displacement @ matrix) * displacement, dim=1
         )
+        if state_constraints:
+            constraint_graph = expression_graph(
+                torch, system.states, state_constraints
+            ).to(torch_device)
+            constraint_values = constraint_graph(points)
+            admissible = torch.all(constraint_values <= 1, dim=1)
+        else:
+            constraint_graph = None
+            constraint_values = None
+            admissible = torch.ones(
+                len(points), dtype=torch.bool, device=torch_device
+            )
 
     outside_bootstrap = quadratic_values >= (
         quadratic_set.level - proof_margin
@@ -138,36 +149,97 @@ def screen_neural_lyapunov(
     )
     local_level = max(precision, local_level)
 
-    bad_decrease = (values >= local_level) & (derivative >= -proof_margin)
+    bad_decrease = (
+        admissible
+        & (values >= local_level)
+        & (derivative >= -proof_margin)
+    )
     decrease_limit = (
         float(values[bad_decrease].min().cpu())
         if bool(bad_decrease.any())
         else None
     )
-    faces = _boundary_samples(
-        torch_device,
-        bounds,
-        max(64, sample_count // (2 * system.state_dimension)),
-        seed,
+    face_limits = []
+    per_face = max(64, sample_count // (2 * system.state_dimension))
+    for coordinate, bound in enumerate(bounds):
+        for side_name, side in (("lower", bound[0]), ("upper", bound[1])):
+            face = _box_samples(
+                torch_device,
+                bounds,
+                per_face,
+                seed + 100 + len(face_limits),
+            )
+            face[:, coordinate] = float(side)
+            face_values, _ = _candidate_values(model, face, batch_size)
+            with torch.no_grad():
+                face_admissible = (
+                    torch.all(constraint_graph(face) <= 1, dim=1)
+                    if constraint_graph is not None
+                    else torch.ones(
+                        len(face), dtype=torch.bool, device=torch_device
+                    )
+                )
+                if (coordinate, side_name) in viable_faces:
+                    outward_sign = -1.0 if side_name == "lower" else 1.0
+                    outward = outward_sign * dynamics(face)[:, coordinate]
+                    face_failure = face_admissible & (
+                        outward >= -face_viability_margin
+                    )
+                else:
+                    face_failure = face_admissible
+            face_limits.append(
+                float(face_values[face_failure].min().cpu())
+                if bool(face_failure.any())
+                else float("inf")
+            )
+    boundary_limit = min(face_limits)
+
+    constraint_limits = []
+    for index, constraint in enumerate(state_constraints):
+        lie_derivative = sp.expand(sum(
+            sp.diff(constraint, state) * dynamics_expression
+            for state, dynamics_expression in zip(
+                system.states, system.symbolic.dynamics
+            )
+        ))
+        lie_graph = expression_graph(
+            torch, system.states, (lie_derivative,)
+        ).to(torch_device)
+        with torch.no_grad():
+            lie_values = lie_graph(points).reshape(-1)
+            boundary_failure = (
+                admissible
+                & (constraint_values[:, index] >= 1 - state_constraint_band)
+                & (lie_values >= -state_constraint_viability_margin)
+            )
+        constraint_limits.append(
+            float(values[boundary_failure].min().cpu())
+            if bool(boundary_failure.any())
+            else float("inf")
+        )
+    constraint_limit = (
+        min(constraint_limits) if constraint_limits else None
     )
-    boundary_values, _ = _candidate_values(model, faces, batch_size)
-    boundary_limit = float(boundary_values.min().cpu())
     observed_outer = min(
         boundary_limit,
         float("inf") if decrease_limit is None else decrease_limit,
+        float("inf") if constraint_limit is None else constraint_limit,
         1.0 if candidate.architecture == "anchored" else float("inf"),
     )
     outer_level = _floor(max(local_level, 0.9 * observed_outer), precision)
     outer_level = max(local_level, outer_level)
     if candidate.architecture == "anchored":
         outer_level = min(outer_level, _floor(1 - 10 * precision, precision))
-    fraction = float((values <= outer_level).float().mean().cpu())
+    fraction = float(
+        (admissible & (values <= outer_level)).float().mean().cpu()
+    )
     return NeuralScreeningResult(
         local_level=local_level,
         outer_level=outer_level,
         containment_limit=containment_limit,
         decrease_limit=decrease_limit,
         boundary_limit=boundary_limit,
+        constraint_limit=constraint_limit,
         estimated_volume=system.domain.volume * fraction,
         sample_count=sample_count,
         seed=seed,

@@ -17,7 +17,13 @@ from .assessment import (
 )
 from .certificates import PolynomialLyapunov
 from .equilibria import NumericalEquilibrium, solve_equilibrium
-from .sets import Box, EuclideanBall, SublevelSet, WholeSpace
+from .sets import (
+    Box,
+    EuclideanBall,
+    RestrictedSublevelSet,
+    SublevelSet,
+    WholeSpace,
+)
 from .systems import ContinuousTimeSystem, ControlAffineSystem, System
 from .verification import (
     GlobalLyapunovVerificationResult,
@@ -70,6 +76,7 @@ __all__ = [
     "QuadraticLyapunov",
     "QuadraticScreeningResult",
     "QuadraticVerificationResult",
+    "RestrictedSublevelSet",
     "SublevelSet",
     "SynthesisStatus",
     "System",
