@@ -42,6 +42,9 @@ class LyapunovSearchResult:
     timings: LyapunovSearchTimings
     scope: str = "roa"
     synthesis: object | None = None
+    assessment: object | None = None
+    data_path: object | None = None
+    model_path: object | None = None
 
     @property
     def is_verified(self):
@@ -93,11 +96,51 @@ def find_lyapunov(
     verification_options=None,
     terms=None,
     search_options=None,
+    architecture="anchored",
+    effort="low",
+    device="auto",
+    results_dir="results",
+    seed=20260823,
+    data_overwrite=False,
+    model_overwrite=False,
+    data_options=None,
+    learner_options=None,
+    learner_verbose=False,
+    verifier_verbose=False,
+    plot=False,
+    plot_options=None,
 ):
     """Construct a Lyapunov candidate and optionally verify it formally."""
 
+    if family == "neural":
+        if scope != "roa":
+            raise ValueError("Neural Lyapunov learning currently uses scope='roa'.")
+        if search not in (None, "pinn"):
+            raise ValueError("Neural Lyapunov learning uses search='pinn'.")
+        from .neural_workflow import find_neural_lyapunov
+
+        return find_neural_lyapunov(
+            system,
+            architecture=architecture,
+            effort=effort,
+            verify=verify,
+            device=device,
+            results_dir=results_dir,
+            seed=seed,
+            data_overwrite=data_overwrite,
+            model_overwrite=model_overwrite,
+            data_options=data_options,
+            learner_options=learner_options,
+            verification_options=verification_options,
+            learner_verbose=learner_verbose,
+            verifier_verbose=verifier_verbose,
+            plot=plot,
+            plot_options=plot_options,
+        )
     if family not in ("quadratic", "polynomial"):
-        raise ValueError("family must be 'quadratic' or 'polynomial'.")
+        raise ValueError(
+            "family must be 'quadratic', 'polynomial', or 'neural'."
+        )
     if scope not in ("roa", "global"):
         raise ValueError("scope must be 'roa' or 'global'.")
     if verify not in (None, False, "z3", "dreal", "crown"):

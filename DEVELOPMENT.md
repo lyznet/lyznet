@@ -20,27 +20,27 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M10 — Plain and anchored neural Lyapunov workflows
+### M11 — Viability-aware state constraints
 
 Status: in progress
 
-Objective: migrate the smallest reproducible neural Lyapunov workflow from
-`lyznet-dev`, including plain and quadratic-anchored candidates.
+Objective: allow intersections of smooth state constraints to form part of a
+formally verified neural region through strict inward-pointing conditions.
 
 Acceptance criteria:
 
-- Trajectory data, training, screening, and formal verification remain
-  visibly separate stages.
-- Plain and anchored architectures share one small public workflow.
-- Saved data and model files have deterministic configuration fingerprints.
-- A minimal Van der Pol example trains, screens, verifies, and plots a small
-  network through the public API.
+- Constraints use the explicit convention ``h_i(x) <= 1``.
+- Decrease is proved only on the admissible constrained annulus.
+- Every active constraint boundary has a visible strict Nagumo condition.
+- Selected box faces may use the same viability argument; other faces remain
+  separated from the verified sublevel.
+- A constrained two-dimensional example screens, verifies, and plots through
+  the public workflow.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M11 | Viability-aware state constraints |
 | M12 | Documentation, packaging, and the `0.1.0` release |
 
 Automatic search policies, homogeneous certificates, compositional
@@ -155,4 +155,22 @@ Validation:
 - Automatic CROWN replay: screened local `0.3804`, outer `2.0837`; both
   formally `VERIFIED`.
 - `vdp_roa_crown.py` saved a two-panel PDF with local and verified contours.
+- `git diff --check`.
+
+### M10 — Plain and anchored neural Lyapunov workflows
+
+Added deterministic trajectory data, compact plain and quadratic-anchored
+neural candidates, two-stage PINN training, empirical level screening, and a
+CROWN reach-and-stay proof bootstrapped by a verified quadratic sublevel. The
+anchored proof works with its latent function and sign-equivalent derivative,
+so CROWN need not bound the final tanh layer.
+
+Validation:
+
+- Base environment: `.venv/bin/python -m pytest -q`
+  (`88 passed, 3 skipped`).
+- CROWN environment: `python -m pytest -q tests/test_neural_lyapunov.py`
+  (`6 passed`).
+- `vdp_mu_1.py`: trained in the low effort setting, screened levels `0.2073`
+  and `0.7158`, formally `VERIFIED` by CROWN, and saved its plot.
 - `git diff --check`.
