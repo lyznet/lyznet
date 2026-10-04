@@ -20,29 +20,26 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M07 — Global and polynomial Lyapunov verification
+### M08 — Quadratic control-Lyapunov verification
 
 Status: in progress
 
-Objective: migrate the compact global Lyapunov verification routes and the
-polynomial-certificate interface from `lyznet-dev`.
+Objective: migrate quadratic control-Lyapunov construction and formal
+verification from `lyznet-dev`.
 
 Acceptance criteria:
 
-- Global decrease and radial-unboundedness conditions remain visible in the
-  verification core.
-- Quadratic global verification reuses the symbolic global verifier where
-  the backend permits it.
-- Polynomial candidates have a small immutable public representation.
-- Synthesis output is independently verified before it is reported.
-- Minimal examples and focused tests exercise global quadratic and polynomial
+- The Artstein CLF condition is visible in the verification core.
+- Z3, dReal, and CROWN remain optional verification backends.
+- The high-level control-Lyapunov workflow is small and rejects unsupported
+  combinations before entering a proof core.
+- Minimal examples and focused tests exercise local and global quadratic CLF
   verification.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M08 | Quadratic control-Lyapunov verification |
 | M09 | Empirical screening and plotting |
 | M10 | Plain and anchored neural Lyapunov workflows |
 | M11 | Viability-aware state constraints |
@@ -115,3 +112,18 @@ Validation:
 - External CROWN environment: `python -m pytest -q`
   (`77 passed`).
 - `vdp_roa_crown.py`: `VERIFIED`, local `0.4`, outer `2.3`.
+
+### M07 — Global and polynomial Lyapunov verification
+
+Added whole-space quadratic verification with Z3 and dReal, an immutable
+polynomial-certificate representation, exact Z3 polynomial synthesis, and an
+independent fixed-candidate verification step. The proof core displays the
+positivity, strict-decrease, and radial-unboundedness conditions directly.
+
+Validation:
+
+- `.venv/bin/python -m pytest -q` (`80 passed, 1 skipped`).
+- `inverted_pendulum.py`: global quadratic certificate `VERIFIED` by Z3.
+- `polynomial_z3.py`: synthesized `V=(x1^2+x2^2)/2`, then independently
+  `VERIFIED` by Z3.
+- `git diff --check`.

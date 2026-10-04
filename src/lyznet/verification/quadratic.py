@@ -28,6 +28,7 @@ class VerificationStatus(Enum):
     VERIFIED = "verified"
     COUNTEREXAMPLE = "counterexample"
     UNKNOWN = "unknown"
+    UNSUPPORTED = "unsupported"
 
 
 class VerificationClaim(Enum):
@@ -45,6 +46,7 @@ class VerificationObligation:
     status: VerificationStatus
     elapsed_time: float
     backend_status: str
+    message: str = ""
 
 
 @dataclass(frozen=True)

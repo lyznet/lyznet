@@ -53,3 +53,11 @@ LyZNet does not bundle the verifier.
 
 Automatic empirical proposal of CROWN levels belongs to the later screening
 stage; this minimal workflow states both proof levels explicitly.
+
+To prove global stability with a quadratic certificate, or synthesize and
+independently verify a polynomial certificate with Z3, run:
+
+```bash
+python examples/minimal_workflows/global_lyapunov/inverted_pendulum.py
+python examples/minimal_workflows/global_lyapunov/polynomial_z3.py
+```
