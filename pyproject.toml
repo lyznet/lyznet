@@ -12,6 +12,10 @@ license = "Apache-2.0"
 authors = [
     {name = "Jun Liu", email = "23146644+j49liu@users.noreply.github.com"},
 ]
+dependencies = [
+    "numpy>=1.26",
+    "sympy>=1.12",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]

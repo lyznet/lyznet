@@ -22,7 +22,7 @@ The first public release is `0.1.0`.
 
 ### M02 — Continuous-time systems and sets
 
-Status: pending
+Status: ready for review
 
 Objective: migrate the continuous-time system definitions and mathematical
 set value objects needed by later analysis and verification code.
@@ -31,12 +31,28 @@ Acceptance criteria:
 
 - Autonomous and control-affine continuous-time systems are immutable and
   validate their dimensions and symbols.
-- Boxes, Euclidean balls, whole space, and symbolic sublevel sets have small,
-  explicit value-object interfaces.
+- Boxes, Euclidean balls, and whole space have small, explicit value-object
+  interfaces.
 - The public package API exposes only the types needed to define systems and
   sets.
 - Focused tests cover valid construction and rejected inputs.
+- A minimal Van der Pol script exercises the public interface directly.
 - No analysis, learning, plotting, or verification code is included.
+
+Validation performed:
+
+- `.venv/bin/python -m pip install -e '.[test]'`
+- `.venv/bin/python -m pytest -q` (`45 passed`)
+- `.venv/bin/python examples/minimal_workflows/system_definition/vdp.py`
+- `.venv/bin/python -m compileall -q src tests`
+- `git diff --check`
+
+Review boundary:
+
+- Runtime dependencies: NumPy and SymPy only.
+- Public types: `System`, `ContinuousTimeSystem`, `ControlAffineSystem`,
+  `Box`, `EuclideanBall`, and `WholeSpace`.
+- Numerical equilibrium solving and certificate sublevel sets are deferred.
 
 ## Queue
 
