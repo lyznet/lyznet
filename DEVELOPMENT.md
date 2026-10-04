@@ -20,26 +20,27 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M05 — dReal verification of quadratic Lyapunov funnels
+### M06 — Optional CROWN verification of quadratic funnels
 
 Status: pending
 
-Objective: migrate the two-stage dReal proof for nonlinear and
-nonpolynomial continuous-time systems.
+Objective: add an optional CROWN backend for the same two-stage quadratic
+funnel theorem without bundling alpha-beta-CROWN.
 
 Acceptance criteria:
 
-- The local contraction and outer annular-decrease conditions are explicit.
-- Numerical equilibria are handled without claiming they are exact.
-- dReal remains an optional dependency.
-- A minimal nonpolynomial example exercises the backend.
-- Focused tests distinguish verified, counterexample, and unknown outcomes.
+- The CROWN theorem and every bounded expression are visible in one core
+  module.
+- PyTorch and alpha-beta-CROWN remain optional external dependencies.
+- The backend requires an exact equilibrium and reports unsupported dynamics
+  explicitly.
+- A minimal polynomial example exercises the backend.
+- Focused tests cover verified and unsupported outcomes.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M06 | Optional CROWN verification of quadratic funnels |
 | M07 | Global and polynomial Lyapunov verification |
 | M08 | Quadratic control-Lyapunov verification |
 | M09 | Empirical screening and plotting |
@@ -89,3 +90,14 @@ Validation:
 
 - `.venv/bin/python -m pytest -q` (`60 passed`)
 - `vdp_roa.py`: `VERIFIED`, level `2.3044`
+
+### M05 — dReal verification of quadratic Lyapunov funnels
+
+Added a two-stage dReal proof: local contraction and invariance followed by
+strict decrease on an outer annulus. Numerical equilibrium evidence is
+retained, and approximate centers receive a separate invariance proof.
+
+Validation:
+
+- `.venv/bin/python -m pytest -q` (`72 passed`)
+- `pendulum_roa.py`: `VERIFIED`, local `1.7371`, outer `3.3332`

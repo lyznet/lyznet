@@ -3,6 +3,7 @@
 from .quadratic import (
     OptionalVerificationDependencyError,
     QuadraticVerificationResult,
+    VerificationClaim,
     VerificationObligation,
     VerificationStatus,
     verify_quadratic_roa,
@@ -11,6 +12,7 @@ from .quadratic import (
 __all__ = [
     "OptionalVerificationDependencyError",
     "QuadraticVerificationResult",
+    "VerificationClaim",
     "VerificationObligation",
     "VerificationStatus",
     "verify_quadratic_roa",

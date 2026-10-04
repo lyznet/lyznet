@@ -30,6 +30,13 @@ class VerificationStatus(Enum):
     UNKNOWN = "unknown"
 
 
+class VerificationClaim(Enum):
+    """The mathematical conclusion established by a formal result."""
+
+    LYAPUNOV = "lyapunov"
+    STABLE_EQUILIBRIUM_ROA = "stable_equilibrium_roa"
+
+
 @dataclass(frozen=True)
 class VerificationObligation:
     """The outcome of one explicit mathematical proof obligation."""
@@ -46,7 +53,9 @@ class QuadraticVerificationResult:
 
     system: object
     certificate: QuadraticLyapunov
+    claim: VerificationClaim
     status: VerificationStatus
+    local_set: SublevelSet | None
     verified_set: SublevelSet | None
     obligations: tuple[VerificationObligation, ...]
     backend: str
@@ -128,7 +137,10 @@ class _QuadraticProblem:
     centre: tuple
     candidate: sp.Expr
     lie_derivative: sp.Expr
+    dynamics_at_centre: tuple
     principal_minors: tuple
+    contraction_matrix: sp.ImmutableMatrix
+    contraction_principal_minors: tuple
 
 
 def _build_problem(system, certificate):
@@ -147,8 +159,24 @@ def _build_problem(system, certificate):
     lie_derivative = (
         sp.ImmutableMatrix([candidate]).jacobian(relative_states) * dynamics
     )[0]
+    relative_origin = {
+        state: sp.Integer(0) for state in relative_states
+    }
+    dynamics_at_centre = tuple(
+        sp.simplify(value.subs(relative_origin, simultaneous=True))
+        for value in dynamics
+    )
     principal_minors = tuple(
         sp.det(matrix[:size, :size])
+        for size in range(1, system.state_dimension + 1)
+    )
+    dynamics_jacobian = dynamics.jacobian(relative_states)
+    contraction_matrix = (
+        dynamics_jacobian.T * matrix + matrix * dynamics_jacobian
+    )
+    negative_contraction = -contraction_matrix
+    contraction_principal_minors = tuple(
+        sp.expand(sp.det(negative_contraction[:size, :size]))
         for size in range(1, system.state_dimension + 1)
     )
     return _QuadraticProblem(
@@ -156,7 +184,10 @@ def _build_problem(system, certificate):
         centre=tuple(centre),
         candidate=sp.expand(candidate),
         lie_derivative=sp.expand(lie_derivative),
+        dynamics_at_centre=dynamics_at_centre,
         principal_minors=principal_minors,
+        contraction_matrix=contraction_matrix,
+        contraction_principal_minors=contraction_principal_minors,
     )
 
 
@@ -216,11 +247,10 @@ def _floor_to_precision(level, precision):
     )
 
 
-def verify_quadratic_roa(
+def _verify_quadratic_roa_z3(
     system,
     *,
     certificate=None,
-    backend="z3",
     search_precision=1e-4,
     maximum_level=None,
     timeout=None,
@@ -233,8 +263,6 @@ def verify_quadratic_roa(
     rounding to ``search_precision``.
     """
 
-    if backend != "z3":
-        raise ValueError("This stage supports only backend='z3'.")
     certificate = (
         quadratic_lyapunov(system) if certificate is None else certificate
     )
@@ -257,6 +285,11 @@ def verify_quadratic_roa(
     z3 = _load_z3()
     started = perf_counter()
     problem = _build_problem(system, certificate)
+    if any(value != 0 for value in problem.dynamics_at_centre):
+        raise ValueError(
+            "Z3 verification requires the stored candidate centre to be an "
+            "exact equilibrium. Use dReal for an approximate centre."
+        )
     positivity_verified = positive_definite_by_sylvester(
         problem.principal_minors
     )
@@ -272,13 +305,15 @@ def verify_quadratic_roa(
     )
     if not positivity_verified:
         return QuadraticVerificationResult(
-            system,
-            certificate,
-            VerificationStatus.COUNTEREXAMPLE,
-            None,
-            (positivity,),
-            "z3",
-            perf_counter() - started,
+            system=system,
+            certificate=certificate,
+            claim=VerificationClaim.LYAPUNOV,
+            status=VerificationStatus.COUNTEREXAMPLE,
+            local_set=None,
+            verified_set=None,
+            obligations=(positivity,),
+            backend="z3",
+            elapsed_time=perf_counter() - started,
         )
 
     z3_states = tuple(
@@ -385,13 +420,15 @@ def verify_quadratic_roa(
             else VerificationStatus.COUNTEREXAMPLE
         )
         return QuadraticVerificationResult(
-            system,
-            certificate,
-            status,
-            None,
-            (positivity,) + failed,
-            "z3",
-            perf_counter() - started,
+            system=system,
+            certificate=certificate,
+            claim=VerificationClaim.LYAPUNOV,
+            status=status,
+            local_set=None,
+            verified_set=None,
+            obligations=(positivity,) + failed,
+            backend="z3",
+            elapsed_time=perf_counter() - started,
         )
 
     best_obligations = check_level(verified_level)
@@ -400,21 +437,74 @@ def verify_quadratic_roa(
         for item in best_obligations
     ):
         raise RuntimeError("The rounded reporting level failed re-verification.")
+    verified_set = SublevelSet(certificate, verified_level)
     return QuadraticVerificationResult(
-        system,
-        certificate,
-        VerificationStatus.VERIFIED,
-        SublevelSet(certificate, verified_level),
-        (positivity,) + best_obligations,
-        "z3",
-        perf_counter() - started,
+        system=system,
+        certificate=certificate,
+        claim=VerificationClaim.LYAPUNOV,
+        status=VerificationStatus.VERIFIED,
+        local_set=verified_set,
+        verified_set=verified_set,
+        obligations=(positivity,) + best_obligations,
+        backend="z3",
+        elapsed_time=perf_counter() - started,
     )
+
+
+def verify_quadratic_roa(
+    system,
+    *,
+    certificate=None,
+    backend="z3",
+    search_precision=1e-4,
+    maximum_level=None,
+    timeout=None,
+    dreal_delta=1e-4,
+    c1_search_precision=1e-4,
+    c2_search_precision=1e-4,
+    local_max_level=None,
+    jobs=1,
+):
+    """Find and formally verify a quadratic Lyapunov sublevel."""
+
+    if backend == "z3":
+        return _verify_quadratic_roa_z3(
+            system,
+            certificate=certificate,
+            search_precision=search_precision,
+            maximum_level=maximum_level,
+            timeout=timeout,
+        )
+    if backend == "dreal":
+        if timeout is not None:
+            raise ValueError(
+                "A hard dReal timeout is not implemented in this stage."
+            )
+        certificate = (
+            quadratic_lyapunov(system)
+            if certificate is None
+            else certificate
+        )
+        from .quadratic_dreal import verify_quadratic_roa_dreal
+
+        return verify_quadratic_roa_dreal(
+            system,
+            certificate,
+            delta=dreal_delta,
+            c1_search_precision=c1_search_precision,
+            c2_search_precision=c2_search_precision,
+            local_max_level=local_max_level,
+            maximum_level=maximum_level,
+            jobs=jobs,
+        )
+    raise ValueError("backend must be 'z3' or 'dreal'.")
 
 
 __all__ = [
     "OptionalVerificationDependencyError",
     "QuadraticVerificationResult",
     "VerificationObligation",
+    "VerificationClaim",
     "VerificationStatus",
     "verify_quadratic_roa",
 ]

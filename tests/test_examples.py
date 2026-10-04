@@ -38,3 +38,21 @@ def test_quadratic_verification_example_runs():
 
     assert "Verified level: 2.3044" in completed.stdout
     assert "Verification status: verified" in completed.stdout
+
+
+def test_dreal_quadratic_example_runs():
+    repository = Path(__file__).resolve().parents[1]
+    completed = subprocess.run(
+        [
+            sys.executable,
+            repository
+            / "examples/minimal_workflows/quadratic_lyapunov/pendulum_roa.py",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Verified local level:" in completed.stdout
+    assert "Verified outer level:" in completed.stdout
+    assert "Formal claim: lyapunov" in completed.stdout

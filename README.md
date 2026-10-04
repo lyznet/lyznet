@@ -12,10 +12,10 @@ The previous implementation is preserved in
 
 ## Current minimal workflow
 
-Install the package with its test and Z3 extras:
+Install the package with its test, Z3, and dReal extras:
 
 ```bash
-python -m pip install -e '.[test,z3]'
+python -m pip install -e '.[test,z3,dreal]'
 ```
 
 To review system construction, run:
@@ -31,4 +31,10 @@ To construct and formally verify a quadratic Lyapunov sublevel, run:
 
 ```bash
 python examples/minimal_workflows/quadratic_lyapunov/vdp_roa.py
+```
+
+To run the two-stage dReal proof for a nonpolynomial pendulum, run:
+
+```bash
+python examples/minimal_workflows/quadratic_lyapunov/pendulum_roa.py
 ```

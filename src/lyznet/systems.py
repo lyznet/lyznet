@@ -3,6 +3,7 @@
 import numpy as np
 import sympy as sp
 
+from .equilibria import NumericalEquilibrium, _compile_dynamics
 from .sets import Box, EuclideanBall
 
 
@@ -169,6 +170,52 @@ def _normalise_exact_point(values, dimension, label):
     return values
 
 
+def _normalise_equilibrium(equilibrium, dimension):
+    if equilibrium is None:
+        return tuple(sp.Integer(0) for _ in range(dimension)), None
+    if isinstance(equilibrium, NumericalEquilibrium):
+        if equilibrium.dimension != dimension:
+            raise ValueError(
+                "Equilibrium must contain {} values, received {}.".format(
+                    dimension, equilibrium.dimension
+                )
+            )
+        return (
+            tuple(sp.Float(repr(value)) for value in equilibrium.point),
+            equilibrium,
+        )
+    return (
+        _normalise_exact_point(equilibrium, dimension, "Equilibrium"),
+        None,
+    )
+
+
+def _validate_numerical_equilibrium(symbolic, solution):
+    if tuple(symbolic.states) != solution.states:
+        raise ValueError(
+            "Numerical equilibrium states do not match the system states."
+        )
+    if len(solution.dynamics) != len(symbolic.dynamics) or any(
+        sp.simplify(left - right) != 0
+        for left, right in zip(symbolic.dynamics, solution.dynamics)
+    ):
+        raise ValueError(
+            "Numerical equilibrium dynamics do not match the system dynamics."
+        )
+    residual = _compile_dynamics(
+        symbolic.states, tuple(symbolic.dynamics)
+    )(solution.point)
+    if (
+        residual.shape != (len(symbolic.states),)
+        or not np.all(np.isfinite(residual))
+        or np.linalg.norm(residual, ord=np.inf)
+        > solution.residual_tolerance
+    ):
+        raise ValueError(
+            "Numerical equilibrium does not meet its residual tolerance."
+        )
+
+
 def _validate_equilibrium(states, dynamics, equilibrium, *, error_message):
     """Require the continuous-time equilibrium condition ``f(x*) = 0``."""
 
@@ -318,22 +365,24 @@ class ContinuousTimeSystem(System):
         _validate_free_symbols(expressions, set(self.states), "dynamics")
         self.name = str(name)
         self.domain = _normalise_domain(domain, len(self.states))
-        self.equilibrium = _normalise_exact_point(
-            (
-                (sp.Integer(0) for _ in self.states)
-                if equilibrium is None
-                else equilibrium
-            ),
-            len(self.states),
-            "Equilibrium",
+        self.equilibrium, self.numerical_equilibrium = _normalise_equilibrium(
+            equilibrium, len(self.states)
         )
         self.symbolic = _AutonomousSymbolicView(self.states, expressions)
-        _validate_equilibrium(
-            self.states,
-            self.symbolic.dynamics,
-            self.equilibrium,
-            error_message="Declared equilibrium is not an equilibrium of the dynamics.",
-        )
+        if self.numerical_equilibrium is None:
+            _validate_equilibrium(
+                self.states,
+                self.symbolic.dynamics,
+                self.equilibrium,
+                error_message=(
+                    "Declared equilibrium is not an equilibrium of the "
+                    "dynamics."
+                ),
+            )
+        else:
+            _validate_numerical_equilibrium(
+                self.symbolic, self.numerical_equilibrium
+            )
         self._numpy = None
         self._make_read_only()
 
@@ -397,14 +446,8 @@ class ControlAffineSystem(System):
         self.name = str(name)
         self.domain = _normalise_domain(domain, len(self.states))
         self.input_set = _normalise_input_set(input_set, len(self.inputs))
-        self.equilibrium = _normalise_exact_point(
-            (
-                (sp.Integer(0) for _ in self.states)
-                if equilibrium is None
-                else equilibrium
-            ),
-            len(self.states),
-            "Equilibrium",
+        self.equilibrium, self.numerical_equilibrium = _normalise_equilibrium(
+            equilibrium, len(self.states)
         )
         self.equilibrium_input = _normalise_exact_point(
             (
@@ -430,15 +473,28 @@ class ControlAffineSystem(System):
             self.symbolic.drift
             + self.symbolic.input_matrix * sp.ImmutableMatrix(self.equilibrium_input)
         )
-        _validate_equilibrium(
-            self.states,
-            controlled_dynamics,
-            self.equilibrium,
-            error_message=(
-                "Declared state and input are not an equilibrium of the "
-                "control-affine dynamics."
-            ),
-        )
+        if self.numerical_equilibrium is None:
+            _validate_equilibrium(
+                self.states,
+                controlled_dynamics,
+                self.equilibrium,
+                error_message=(
+                    "Declared state and input are not an equilibrium of the "
+                    "control-affine dynamics."
+                ),
+            )
+        else:
+            if any(value != 0 for value in self.equilibrium_input):
+                raise ValueError(
+                    "A numerical equilibrium currently requires zero "
+                    "equilibrium input."
+                )
+            numerical_symbolic = _AutonomousSymbolicView(
+                self.states, drift
+            )
+            _validate_numerical_equilibrium(
+                numerical_symbolic, self.numerical_equilibrium
+            )
         self._numpy = None
         self._make_read_only()
 
@@ -474,11 +530,36 @@ class ControlAffineSystem(System):
             self.symbolic.drift
             + self.symbolic.input_matrix * sp.ImmutableMatrix(controller)
         )
+        equilibrium = self.equilibrium
+        if self.numerical_equilibrium is not None:
+            dynamics_tuple = tuple(dynamics)
+            residual = _compile_dynamics(
+                self.states, dynamics_tuple
+            )(self.numerical_equilibrium.point)
+            try:
+                equilibrium = NumericalEquilibrium(
+                    states=self.states,
+                    dynamics=dynamics_tuple,
+                    point=self.numerical_equilibrium.point,
+                    residual=tuple(residual),
+                    residual_tolerance=(
+                        self.numerical_equilibrium.residual_tolerance
+                    ),
+                    method=(
+                        self.numerical_equilibrium.method
+                        + "; closed-loop residual evaluation"
+                    ),
+                )
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    "Controller does not preserve the numerical equilibrium "
+                    "within its residual tolerance."
+                ) from error
         return ContinuousTimeSystem(
             states=self.states,
             dynamics=tuple(dynamics),
             domain=self.domain,
-            equilibrium=self.equilibrium,
+            equilibrium=equilibrium,
             name=(
                 name if name is not None else "{}-closed-loop".format(self.name)
             ),

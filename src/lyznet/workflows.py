@@ -23,6 +23,7 @@ class LyapunovSearchTimings:
 class VerifiedLyapunovCertificate:
     system: object
     candidate: QuadraticLyapunov
+    local_set: SublevelSet
     verified_set: SublevelSet
     verification: QuadraticVerificationResult
 
@@ -56,6 +57,7 @@ class LyapunovSearchResult:
         return VerifiedLyapunovCertificate(
             system=self.system,
             candidate=self.candidate,
+            local_set=self.verification.local_set,
             verified_set=self.verification.verified_set,
             verification=self.verification,
         )
@@ -72,8 +74,8 @@ def find_lyapunov(
 
     if family != "quadratic":
         raise ValueError("This stage supports only family='quadratic'.")
-    if verify not in (None, False, "z3"):
-        raise ValueError("verify must be None, False, or 'z3'.")
+    if verify not in (None, False, "z3", "dreal"):
+        raise ValueError("verify must be None, False, 'z3', or 'dreal'.")
     options = {} if verification_options is None else dict(verification_options)
 
     total_started = perf_counter()
@@ -83,12 +85,12 @@ def find_lyapunov(
 
     verification = None
     verification_time = 0.0
-    if verify == "z3":
+    if verify in ("z3", "dreal"):
         verification_started = perf_counter()
         verification = verify_quadratic_roa(
             system,
             certificate=candidate,
-            backend="z3",
+            backend=verify,
             **options,
         )
         verification_time = perf_counter() - verification_started
