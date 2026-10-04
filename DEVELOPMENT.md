@@ -20,35 +20,28 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M01 — Package foundation
+### M02 — Continuous-time systems and sets
 
 Status: pending
 
-Objective: create a small, installable Python package without scientific
-functionality.
+Objective: migrate the continuous-time system definitions and mathematical
+set value objects needed by later analysis and verification code.
 
 Acceptance criteria:
 
-- `pip install -e .` succeeds in a fresh Python 3.11 environment.
-- `import lyznet` succeeds.
-- The package exposes its generated development version.
-- A package-import test passes.
-- Continuous integration runs the test on Linux.
-
-Expected files:
-
-- `.github/workflows/tests.yml`
-- `.gitignore`
-- `LICENSE`
-- `pyproject.toml`
-- `src/lyznet/__init__.py`
-- `tests/test_package.py`
+- Autonomous and control-affine continuous-time systems are immutable and
+  validate their dimensions and symbols.
+- Boxes, Euclidean balls, whole space, and symbolic sublevel sets have small,
+  explicit value-object interfaces.
+- The public package API exposes only the types needed to define systems and
+  sets.
+- Focused tests cover valid construction and rejected inputs.
+- No analysis, learning, plotting, or verification code is included.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M02 | Continuous-time systems and sets |
 | M03 | Quadratic Lyapunov and control-Lyapunov analysis |
 | M04 | Z3 verification of quadratic Lyapunov sublevels |
 | M05 | dReal verification of quadratic Lyapunov funnels |
@@ -66,4 +59,14 @@ corresponding general interfaces are ready.
 
 ## Completed work
 
-No implementation task has been completed.
+### M01 — Package foundation
+
+Created the installable package skeleton, generated development versions,
+Linux CI, and the first import test.
+
+Validation:
+
+- `.venv/bin/python -m pip install -e '.[test]'`
+- `.venv/bin/python -c 'import lyznet; print(lyznet.__version__)'`
+- `.venv/bin/python -m pytest -q` (`1 passed`)
+- `git diff --check`
