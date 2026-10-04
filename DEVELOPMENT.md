@@ -20,46 +20,26 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M02 — Continuous-time systems and sets
+### M04 — Z3 verification of quadratic Lyapunov sublevels
 
-Status: ready for review
+Status: in progress
 
-Objective: migrate the continuous-time system definitions and mathematical
-set value objects needed by later analysis and verification code.
+Objective: provide one auditable formal condition and a runnable minimal
+workflow for a quadratic Lyapunov sublevel on a polynomial system.
 
 Acceptance criteria:
 
-- Autonomous and control-affine continuous-time systems are immutable and
-  validate their dimensions and symbols.
-- Boxes, Euclidean balls, and whole space have small, explicit value-object
-  interfaces.
-- The public package API exposes only the types needed to define systems and
-  sets.
-- Focused tests cover valid construction and rejected inputs.
-- A minimal Van der Pol script exercises the public interface directly.
-- No analysis, learning, plotting, or verification code is included.
-
-Validation performed:
-
-- `.venv/bin/python -m pip install -e '.[test]'`
-- `.venv/bin/python -m pytest -q` (`45 passed`)
-- `.venv/bin/python examples/minimal_workflows/system_definition/vdp.py`
-- `.venv/bin/python -m compileall -q src tests`
-- `git diff --check`
-
-Review boundary:
-
-- Runtime dependencies: NumPy and SymPy only.
-- Public types: `System`, `ContinuousTimeSystem`, `ControlAffineSystem`,
-  `Box`, `EuclideanBall`, and `WholeSpace`.
-- Numerical equilibrium solving and certificate sublevel sets are deferred.
+- The mathematical violation queried by Z3 is visible in one core module.
+- An `unsat` result produces an immutable formal verification record.
+- The verifier searches for a level to precision `1e-4` by default.
+- The verified sublevel is strictly contained in the declared box.
+- A minimal Van der Pol script constructs, verifies, and reports the result.
+- Focused tests cover successful proof, counterexample, and invalid input.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M03 | Quadratic Lyapunov and control-Lyapunov analysis |
-| M04 | Z3 verification of quadratic Lyapunov sublevels |
 | M05 | dReal verification of quadratic Lyapunov funnels |
 | M06 | Optional CROWN verification of quadratic funnels |
 | M07 | Global and polynomial Lyapunov verification |
@@ -86,3 +66,17 @@ Validation:
 - `.venv/bin/python -c 'import lyznet; print(lyznet.__version__)'`
 - `.venv/bin/python -m pytest -q` (`1 passed`)
 - `git diff --check`
+
+### M02 — Continuous-time systems and sets
+
+Added immutable autonomous and control-affine systems, numerical views, basic
+sets, and a runnable Van der Pol definition.
+
+Validation: `.venv/bin/python -m pytest -q` (`45 passed`).
+
+### M03 — Quadratic Lyapunov construction
+
+Added system linearization and the numerically checked construction
+`A.T P + P A = -Q` for a Hurwitz linearization.
+
+Validation: `.venv/bin/python -m pytest -q` (`53 passed`).

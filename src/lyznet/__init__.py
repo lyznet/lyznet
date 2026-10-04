@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from .analysis import QuadraticLyapunov, linearize, quadratic_lyapunov
 from .sets import Box, EuclideanBall, WholeSpace
 from .systems import ContinuousTimeSystem, ControlAffineSystem, System
 
@@ -17,7 +18,10 @@ __all__ = [
     "ContinuousTimeSystem",
     "ControlAffineSystem",
     "EuclideanBall",
+    "QuadraticLyapunov",
     "System",
     "WholeSpace",
     "__version__",
+    "linearize",
+    "quadratic_lyapunov",
 ]
