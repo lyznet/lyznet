@@ -77,6 +77,11 @@ class LyapunovSearchResult:
             verification=self.verification,
         )
 
+    def plot(self, **options):
+        from .plotting import plot_lyapunov_result
+
+        return plot_lyapunov_result(self, **options)
+
 
 def find_lyapunov(
     system,

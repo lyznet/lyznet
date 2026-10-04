@@ -1,6 +1,6 @@
 """Z3 adapter for direct verification of quadratic Lyapunov sublevels."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, ROUND_FLOOR
 from enum import Enum
 from importlib import import_module
@@ -63,6 +63,7 @@ class QuadraticVerificationResult:
     obligations: tuple[VerificationObligation, ...]
     backend: str
     elapsed_time: float
+    assessment: object | None = None
 
     @property
     def verified_level(self):
@@ -491,6 +492,8 @@ def verify_quadratic_roa(
     crown_proof_margin=1e-6,
     crown_local_decrease_margin=1e-4,
     crown_verbose=False,
+    screening_samples=2**16,
+    screening_seed=20260823,
 ):
     """Find or verify a quadratic Lyapunov sublevel.
 
@@ -530,12 +533,36 @@ def verify_quadratic_roa(
             jobs=jobs,
         )
     if backend == "crown":
+        screening = None
         if local_max_level is None or maximum_level is None:
-            raise ValueError(
-                "CROWN requires proposed local_max_level and maximum_level; "
-                "automatic empirical proposal is added in the screening "
-                "stage."
+            from lyznet.assessment import screen_quadratic_roa
+
+            screening = screen_quadratic_roa(
+                system,
+                certificate,
+                sample_count=screening_samples,
+                seed=screening_seed,
+                maximum_level=maximum_level,
+                precision=c1_search_precision,
+                proof_margin=crown_proof_margin,
+                local_decrease_margin=crown_local_decrease_margin,
             )
+            proposed_outer = screening.outer.suggested_level
+            proposed_local = min(
+                screening.local.suggested_level, proposed_outer
+            )
+            local_max_level = (
+                proposed_local
+                if local_max_level is None
+                else local_max_level
+            )
+            maximum_level = (
+                proposed_outer if maximum_level is None else maximum_level
+            )
+            if local_max_level <= 0 or maximum_level <= 0:
+                raise RuntimeError(
+                    "Empirical screening found no positive CROWN level."
+                )
         certificate = (
             quadratic_lyapunov(system)
             if certificate is None
@@ -543,7 +570,7 @@ def verify_quadratic_roa(
         )
         from .quadratic_crown import verify_quadratic_roa_crown
 
-        return verify_quadratic_roa_crown(
+        result = verify_quadratic_roa_crown(
             system,
             certificate,
             local_level=local_max_level,
@@ -555,6 +582,7 @@ def verify_quadratic_roa(
             local_decrease_margin=crown_local_decrease_margin,
             verbose=crown_verbose,
         )
+        return replace(result, assessment=screening)
     raise ValueError("backend must be 'z3', 'dreal', or 'crown'.")
 
 

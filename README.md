@@ -39,8 +39,8 @@ To run the two-stage dReal proof for a nonpolynomial pendulum, run:
 python examples/minimal_workflows/quadratic_lyapunov/pendulum_roa.py
 ```
 
-The optional CROWN backend verifies proposed local and outer levels without
-vendoring alpha-beta-CROWN into LyZNet:
+The optional CROWN backend uses empirical screening to propose local and outer
+levels, then verifies those fixed levels without formal bisection:
 
 ```bash
 python -m pip install -e '.[crown]'
@@ -51,8 +51,13 @@ Install alpha-beta-CROWN 0.7 separately from its
 [upstream repository](https://github.com/Verified-Intelligence/alpha-beta-CROWN);
 LyZNet does not bundle the verifier.
 
-Automatic empirical proposal of CROWN levels belongs to the later screening
-stage; this minimal workflow states both proof levels explicitly.
+The returned assessment records the sampled proposals as empirical evidence;
+only the subsequent CROWN obligations establish a formal result. Install the
+`plot` extra to save the example's PDF:
+
+```bash
+python -m pip install -e '.[plot]'
+```
 
 To prove global stability with a quadratic certificate, or synthesize and
 independently verify a polynomial certificate with Z3, run:

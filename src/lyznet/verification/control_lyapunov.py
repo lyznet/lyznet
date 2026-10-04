@@ -1,5 +1,6 @@
 """Quadratic control-Lyapunov verification and orchestration."""
 
+from dataclasses import replace
 from time import perf_counter
 
 import numpy as np
@@ -390,6 +391,8 @@ def verify_quadratic_clf(
     crown_batch_size=64,
     crown_proof_margin=1e-6,
     crown_verbose=False,
+    screening_samples=2**16,
+    screening_seed=20260823,
 ):
     """Find or verify an unrestricted-input quadratic CLF sublevel."""
 
@@ -429,12 +432,37 @@ def verify_quadratic_clf(
             jobs=jobs,
         )
     if backend == "crown":
+        screening = None
         if local_max_level is None or maximum_level is None:
-            raise ValueError(
-                "CROWN requires proposed local_max_level and maximum_level."
+            from lyznet.assessment import screen_quadratic_clf
+
+            screening = screen_quadratic_clf(
+                system,
+                candidate,
+                sample_count=screening_samples,
+                seed=screening_seed,
+                maximum_level=maximum_level,
+                precision=c1_search_precision,
+                proof_margin=crown_proof_margin,
             )
+            proposed_outer = screening.outer.suggested_level
+            proposed_local = min(
+                screening.local.suggested_level, proposed_outer
+            )
+            local_max_level = (
+                proposed_local
+                if local_max_level is None
+                else local_max_level
+            )
+            maximum_level = (
+                proposed_outer if maximum_level is None else maximum_level
+            )
+            if local_max_level <= 0 or maximum_level <= 0:
+                raise RuntimeError(
+                    "Empirical screening found no positive CROWN level."
+                )
         from .quadratic_clf_crown import verify_quadratic_clf_crown
-        return verify_quadratic_clf_crown(
+        result = verify_quadratic_clf_crown(
             system,
             candidate,
             local_level=local_max_level,
@@ -445,6 +473,7 @@ def verify_quadratic_clf(
             proof_margin=crown_proof_margin,
             verbose=crown_verbose,
         )
+        return replace(result, assessment=screening)
 
 
 __all__ = ["verify_global_quadratic_clf", "verify_quadratic_clf"]

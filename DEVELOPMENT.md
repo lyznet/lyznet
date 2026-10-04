@@ -20,26 +20,26 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M09 — Empirical screening and plotting
+### M10 — Plain and anchored neural Lyapunov workflows
 
 Status: in progress
 
-Objective: add empirical level proposals and compact plotting without mixing
-empirical evidence from formal proof results.
+Objective: migrate the smallest reproducible neural Lyapunov workflow from
+`lyznet-dev`, including plain and quadratic-anchored candidates.
 
 Acceptance criteria:
 
-- Screening evaluates the same mathematical predicates as the corresponding
-  formal backend and labels its results as empirical.
-- CROWN can consume screened level proposals without formal bisection.
-- Quadratic LF and CLF results have one compact paper-oriented plotting path.
-- Minimal examples and focused tests exercise proposal and plotting behavior.
+- Trajectory data, training, screening, and formal verification remain
+  visibly separate stages.
+- Plain and anchored architectures share one small public workflow.
+- Saved data and model files have deterministic configuration fingerprints.
+- A minimal Van der Pol example trains, screens, verifies, and plots a small
+  network through the public API.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M10 | Plain and anchored neural Lyapunov workflows |
 | M11 | Viability-aware state constraints |
 | M12 | Documentation, packaging, and the `0.1.0` release |
 
@@ -141,3 +141,18 @@ Validation:
 - `vdp_global.py`: global quadratic CLF `VERIFIED` by Z3.
 - `vdp_roa_dreal.py`: local `2.8708`, outer `42.096`, both `VERIFIED`.
 - `linear_roa_crown.py`: local `0.1`, outer `0.2`, both `VERIFIED`.
+
+### M09 — Empirical screening and plotting
+
+Added deterministic Sobol screening for the quadratic LF and CLF predicates,
+automatic conservative CROWN proposals, and a compact optional Matplotlib
+plotter. Empirical proposal records explicitly report that they are not formal
+evidence; fixed proposed levels are still checked by CROWN.
+
+Validation:
+
+- `.venv/bin/python -m pytest -q` (`88 passed, 2 skipped`).
+- Automatic CROWN replay: screened local `0.3804`, outer `2.0837`; both
+  formally `VERIFIED`.
+- `vdp_roa_crown.py` saved a two-panel PDF with local and verified contours.
+- `git diff --check`.

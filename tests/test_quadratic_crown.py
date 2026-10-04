@@ -18,9 +18,37 @@ def stable_van_der_pol():
     )
 
 
-def test_crown_requires_proposed_levels():
-    with pytest.raises(ValueError, match="requires proposed"):
-        lz.verify_quadratic_roa(stable_van_der_pol(), backend="crown")
+def test_crown_uses_empirical_proposals_when_levels_are_omitted(
+    monkeypatch,
+):
+    class FakeRunner:
+        def __init__(self, **kwargs):
+            pass
+
+        def solve(self, name, model, output_dimension, condition, bounds):
+            return lz.VerificationObligation(
+                name=name,
+                status=lz.VerificationStatus.VERIFIED,
+                elapsed_time=0.0,
+                backend_status="verified",
+            )
+
+    monkeypatch.setattr(adapter, "load_crown", lambda: (object(), object()))
+    monkeypatch.setattr(adapter, "normalise_device", lambda torch, value: "cpu")
+    monkeypatch.setattr(adapter, "expression_graph", lambda *args: object())
+    monkeypatch.setattr(adapter, "CrownRunner", FakeRunner)
+
+    result = lz.verify_quadratic_roa(
+        stable_van_der_pol(),
+        backend="crown",
+        screening_samples=2**10,
+    )
+
+    assert result.is_verified
+    assert result.assessment is not None
+    assert not result.assessment.is_formal
+    assert result.local_set.level == result.assessment.local.suggested_level
+    assert result.verified_set.level == result.assessment.outer.suggested_level
 
 
 def test_crown_rejects_an_approximate_equilibrium_before_loading_backend(

@@ -1,4 +1,6 @@
-"""Verify one proposed quadratic Lyapunov funnel with CROWN."""
+"""Screen, verify, and plot a quadratic Lyapunov funnel with CROWN."""
+
+from pathlib import Path
 
 import sympy as sp
 
@@ -17,13 +19,15 @@ if __name__ == "__main__":
     result = lz.find_lyapunov(
         system,
         verify="crown",
-        verification_options={
-            "local_max_level": 0.4,
-            "maximum_level": 2.3,
-        },
     )
     certificate = result.require_verified()
     print("Quadratic Lyapunov matrix:\n", certificate.candidate.matrix)
     print("Verified local level:", certificate.local_set.level)
     print("Verified outer level:", certificate.verified_set.level)
+    print("Empirical proposals:", result.verification.assessment)
     print("Timings:", result.timings)
+    result.plot(
+        surface=True,
+        show=False,
+        save=Path(__file__).parent / "results" / "vdp_roa_crown.pdf",
+    )
