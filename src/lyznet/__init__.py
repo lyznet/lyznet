@@ -2,7 +2,13 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-from .analysis import QuadraticLyapunov, linearize, quadratic_lyapunov
+from .analysis import (
+    QuadraticControlLyapunov,
+    QuadraticLyapunov,
+    linearize,
+    quadratic_control_lyapunov,
+    quadratic_lyapunov,
+)
 from .certificates import PolynomialLyapunov
 from .equilibria import NumericalEquilibrium, solve_equilibrium
 from .sets import Box, EuclideanBall, SublevelSet, WholeSpace
@@ -17,6 +23,8 @@ from .verification import (
     verify_quadratic_roa,
     verify_global_lyapunov,
     verify_global_quadratic,
+    verify_global_quadratic_clf,
+    verify_quadratic_clf,
 )
 from .synthesis import (
     PolynomialLyapunovSynthesisResult,
@@ -27,6 +35,7 @@ from .workflows import (
     LyapunovSearchResult,
     LyapunovSearchTimings,
     VerifiedLyapunovCertificate,
+    find_control_lyapunov,
     find_lyap,
     find_lyapunov,
 )
@@ -50,6 +59,7 @@ __all__ = [
     "OptionalVerificationDependencyError",
     "PolynomialLyapunov",
     "PolynomialLyapunovSynthesisResult",
+    "QuadraticControlLyapunov",
     "QuadraticLyapunov",
     "QuadraticVerificationResult",
     "SublevelSet",
@@ -62,12 +72,16 @@ __all__ = [
     "WholeSpace",
     "__version__",
     "find_lyap",
+    "find_control_lyapunov",
     "find_lyapunov",
     "linearize",
     "quadratic_lyapunov",
+    "quadratic_control_lyapunov",
     "solve_equilibrium",
     "synthesize_global_polynomial_lyapunov",
     "verify_global_lyapunov",
     "verify_global_quadratic",
+    "verify_global_quadratic_clf",
+    "verify_quadratic_clf",
     "verify_quadratic_roa",
 ]

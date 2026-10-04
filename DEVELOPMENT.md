@@ -20,27 +20,25 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M08 — Quadratic control-Lyapunov verification
+### M09 — Empirical screening and plotting
 
 Status: in progress
 
-Objective: migrate quadratic control-Lyapunov construction and formal
-verification from `lyznet-dev`.
+Objective: add empirical level proposals and compact plotting without mixing
+empirical evidence from formal proof results.
 
 Acceptance criteria:
 
-- The Artstein CLF condition is visible in the verification core.
-- Z3, dReal, and CROWN remain optional verification backends.
-- The high-level control-Lyapunov workflow is small and rejects unsupported
-  combinations before entering a proof core.
-- Minimal examples and focused tests exercise local and global quadratic CLF
-  verification.
+- Screening evaluates the same mathematical predicates as the corresponding
+  formal backend and labels its results as empirical.
+- CROWN can consume screened level proposals without formal bisection.
+- Quadratic LF and CLF results have one compact paper-oriented plotting path.
+- Minimal examples and focused tests exercise proposal and plotting behavior.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M09 | Empirical screening and plotting |
 | M10 | Plain and anchored neural Lyapunov workflows |
 | M11 | Viability-aware state constraints |
 | M12 | Documentation, packaging, and the `0.1.0` release |
@@ -127,3 +125,19 @@ Validation:
 - `polynomial_z3.py`: synthesized `V=(x1^2+x2^2)/2`, then independently
   `VERIFIED` by Z3.
 - `git diff --check`.
+
+### M08 — Quadratic control-Lyapunov verification
+
+Added immutable LQR quadratic CLF candidates, global and bounded Artstein
+proofs with Z3, and symmetric two-stage dReal/CROWN funnel proofs. The formal
+core shows the Artstein implication and local contraction conditions directly.
+
+Validation:
+
+- Base environment: `.venv/bin/python -m pytest -q`
+  (`85 passed, 2 skipped`).
+- CROWN environment: `python -m pytest -q tests/test_control_lyapunov.py`
+  (`6 passed`).
+- `vdp_global.py`: global quadratic CLF `VERIFIED` by Z3.
+- `vdp_roa_dreal.py`: local `2.8708`, outer `42.096`, both `VERIFIED`.
+- `linear_roa_crown.py`: local `0.1`, outer `0.2`, both `VERIFIED`.

@@ -170,6 +170,105 @@ class QuadraticLyapunov:
         )
 
 
+@dataclass(frozen=True)
+class QuadraticControlLyapunov:
+    """Numerical data for an LQR quadratic control-Lyapunov function."""
+
+    matrix: np.ndarray
+    q_matrix: np.ndarray
+    r_matrix: np.ndarray
+    linearization: np.ndarray
+    input_linearization: np.ndarray
+    centre: np.ndarray
+
+    def __post_init__(self):
+        for name in (
+            "matrix",
+            "q_matrix",
+            "r_matrix",
+            "linearization",
+            "input_linearization",
+            "centre",
+        ):
+            object.__setattr__(
+                self, name, _immutable_array(getattr(self, name), name)
+            )
+        if (
+            self.matrix.ndim != 2
+            or self.matrix.shape[0] < 1
+            or self.matrix.shape[0] != self.matrix.shape[1]
+        ):
+            raise ValueError("matrix must be a nonempty square matrix.")
+        if (
+            self.r_matrix.ndim != 2
+            or self.r_matrix.shape[0] < 1
+            or self.r_matrix.shape[0] != self.r_matrix.shape[1]
+        ):
+            raise ValueError("r_matrix must be a nonempty square matrix.")
+        state_dimension = self.matrix.shape[0]
+        input_dimension = self.r_matrix.shape[0]
+        for name, shape in (
+            ("matrix", (state_dimension, state_dimension)),
+            ("q_matrix", (state_dimension, state_dimension)),
+            ("r_matrix", (input_dimension, input_dimension)),
+            ("linearization", (state_dimension, state_dimension)),
+            (
+                "input_linearization",
+                (state_dimension, input_dimension),
+            ),
+            ("centre", (state_dimension,)),
+        ):
+            if getattr(self, name).shape != shape:
+                raise ValueError("{} must have shape {}.".format(name, shape))
+
+    @property
+    def state_dimension(self):
+        return self.matrix.shape[0]
+
+    @property
+    def input_dimension(self):
+        return self.r_matrix.shape[0]
+
+    @property
+    def gain(self):
+        """Return the LQR feedback under ``u-u*=K(x-x*)``."""
+
+        return -np.linalg.solve(
+            self.r_matrix,
+            self.input_linearization.T @ self.matrix,
+        )
+
+    @property
+    def residual(self):
+        feedback = (
+            self.matrix
+            @ self.input_linearization
+            @ np.linalg.solve(
+                self.r_matrix,
+                self.input_linearization.T @ self.matrix,
+            )
+        )
+        return (
+            self.linearization.T @ self.matrix
+            + self.matrix @ self.linearization
+            - feedback
+            + self.q_matrix
+        )
+
+    def value(self, states):
+        values = np.asarray(states)
+        if values.ndim == 0 or values.shape[-1] != self.state_dimension:
+            raise ValueError(
+                "States must have shape (..., {}).".format(
+                    self.state_dimension
+                )
+            )
+        shifted = values - self.centre
+        return np.einsum(
+            "...i,ij,...j->...", shifted, self.matrix, shifted
+        )
+
+
 def quadratic_lyapunov(system, q_matrix=None, at=None):
     """Construct a quadratic candidate from a stable linearization.
 
@@ -232,4 +331,77 @@ def quadratic_lyapunov(system, q_matrix=None, at=None):
     )
 
 
-__all__ = ["QuadraticLyapunov", "linearize", "quadratic_lyapunov"]
+def quadratic_control_lyapunov(system, q_matrix=None, r_matrix=None):
+    """Construct a continuous-time LQR quadratic CLF at equilibrium."""
+
+    if not isinstance(system, ControlAffineSystem):
+        raise TypeError(
+            "quadratic_control_lyapunov requires a control-affine system."
+        )
+    q_matrix = _positive_definite_matrix(
+        np.eye(system.state_dimension) if q_matrix is None else q_matrix,
+        system.state_dimension,
+        "q_matrix",
+    )
+    r_matrix = _positive_definite_matrix(
+        np.eye(system.input_dimension) if r_matrix is None else r_matrix,
+        system.input_dimension,
+        "r_matrix",
+    )
+    state_matrix = linearize(system)
+    substitutions = dict(zip(system.states, system.equilibrium))
+    input_matrix = _real_finite_array(
+        system.symbolic.input_matrix.subs(
+            substitutions, simultaneous=True
+        ).tolist(),
+        "Input linearization",
+    )
+
+    # Continuous-time algebraic Riccati equation:
+    # A.T P + P A - P B R^-1 B.T P + Q = 0.
+    try:
+        matrix = linalg.solve_continuous_are(
+            state_matrix, input_matrix, q_matrix, r_matrix
+        )
+    except linalg.LinAlgError as error:
+        raise ValueError(
+            "The linearization is not stabilizable for these LQR weights."
+        ) from error
+    matrix = _real_finite_array(
+        0.5 * (matrix + matrix.T), "Riccati solution"
+    )
+    if np.min(np.linalg.eigvalsh(matrix)) <= 0:
+        raise ValueError("The Riccati solution must be positive definite.")
+    feedback_term = (
+        matrix
+        @ input_matrix
+        @ np.linalg.solve(r_matrix, input_matrix.T @ matrix)
+    )
+    residual_terms = (
+        state_matrix.T @ matrix,
+        matrix @ state_matrix,
+        -feedback_term,
+        q_matrix,
+    )
+    _require_small_residual(sum(residual_terms), residual_terms)
+    gain = -np.linalg.solve(r_matrix, input_matrix.T @ matrix)
+    closed_loop = state_matrix + input_matrix @ gain
+    if np.max(np.real(np.linalg.eigvals(closed_loop))) >= 0:
+        raise ValueError("The LQR closed-loop linearization is not Hurwitz.")
+    return QuadraticControlLyapunov(
+        matrix=matrix,
+        q_matrix=q_matrix,
+        r_matrix=r_matrix,
+        linearization=state_matrix,
+        input_linearization=input_matrix,
+        centre=_real_finite_array(system.equilibrium, "LQR centre"),
+    )
+
+
+__all__ = [
+    "QuadraticControlLyapunov",
+    "QuadraticLyapunov",
+    "linearize",
+    "quadratic_control_lyapunov",
+    "quadratic_lyapunov",
+]

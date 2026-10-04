@@ -35,6 +35,7 @@ class VerificationClaim(Enum):
     """The mathematical conclusion established by a formal result."""
 
     LYAPUNOV = "lyapunov"
+    CONTROL_LYAPUNOV = "control_lyapunov"
     STABLE_EQUILIBRIUM_ROA = "stable_equilibrium_roa"
 
 

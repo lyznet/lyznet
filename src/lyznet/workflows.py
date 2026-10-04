@@ -3,7 +3,11 @@
 from dataclasses import dataclass
 from time import perf_counter
 
-from .analysis import QuadraticLyapunov, quadratic_lyapunov
+from .analysis import (
+    QuadraticLyapunov,
+    quadratic_control_lyapunov,
+    quadratic_lyapunov,
+)
 from .sets import SublevelSet
 from .synthesis import synthesize_global_polynomial_lyapunov
 from .verification import (
@@ -173,6 +177,77 @@ def find_lyapunov(
     )
 
 
+def find_control_lyapunov(
+    system,
+    *,
+    family="quadratic",
+    search="lqr",
+    scope="roa",
+    verify=None,
+    verification_options=None,
+):
+    """Construct an LQR quadratic CLF and optionally verify it formally."""
+
+    if family != "quadratic":
+        raise ValueError("This stage supports family='quadratic'.")
+    if search != "lqr":
+        raise ValueError("Quadratic CLF construction uses search='lqr'.")
+    if scope not in ("roa", "global"):
+        raise ValueError("scope must be 'roa' or 'global'.")
+    if verify not in (None, False, "z3", "dreal", "crown"):
+        raise ValueError(
+            "verify must be None, False, 'z3', 'dreal', or 'crown'."
+        )
+    if scope == "global" and verify in ("dreal", "crown"):
+        raise ValueError(
+            "Global CLF verification uses Z3; use scope='roa' for "
+            "dReal or CROWN."
+        )
+    options = (
+        {} if verification_options is None else dict(verification_options)
+    )
+    total_started = perf_counter()
+    candidate_started = perf_counter()
+    candidate = quadratic_control_lyapunov(system)
+    candidate_time = perf_counter() - candidate_started
+    verification = None
+    verification_time = 0.0
+    if verify in ("z3", "dreal", "crown"):
+        from .verification.control_lyapunov import (
+            verify_global_quadratic_clf,
+            verify_quadratic_clf,
+        )
+
+        verification_started = perf_counter()
+        if scope == "global":
+            verification = verify_global_quadratic_clf(
+                system,
+                candidate,
+                backend=verify,
+                **options,
+            )
+        else:
+            verification = verify_quadratic_clf(
+                system,
+                candidate,
+                backend=verify,
+                **options,
+            )
+        verification_time = perf_counter() - verification_started
+    return LyapunovSearchResult(
+        system=system,
+        family=family,
+        candidate=candidate,
+        verification=verification,
+        timings=LyapunovSearchTimings(
+            candidate=candidate_time,
+            verification=verification_time,
+            total=perf_counter() - total_started,
+        ),
+        scope=scope,
+    )
+
+
 find_lyap = find_lyapunov
 
 
@@ -180,6 +255,7 @@ __all__ = [
     "LyapunovSearchResult",
     "LyapunovSearchTimings",
     "VerifiedLyapunovCertificate",
+    "find_control_lyapunov",
     "find_lyap",
     "find_lyapunov",
 ]

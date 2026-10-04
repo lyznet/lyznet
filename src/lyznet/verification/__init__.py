@@ -13,6 +13,10 @@ from .global_lyapunov import (
     verify_global_lyapunov,
 )
 from .global_quadratic import verify_global_quadratic
+from .control_lyapunov import (
+    verify_global_quadratic_clf,
+    verify_quadratic_clf,
+)
 
 __all__ = [
     "OptionalVerificationDependencyError",
@@ -24,4 +28,6 @@ __all__ = [
     "verify_quadratic_roa",
     "verify_global_lyapunov",
     "verify_global_quadratic",
+    "verify_global_quadratic_clf",
+    "verify_quadratic_clf",
 ]

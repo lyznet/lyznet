@@ -61,3 +61,15 @@ independently verify a polynomial certificate with Z3, run:
 python examples/minimal_workflows/global_lyapunov/inverted_pendulum.py
 python examples/minimal_workflows/global_lyapunov/polynomial_z3.py
 ```
+
+For a control-affine system, construct an LQR quadratic control-Lyapunov
+function and verify either a global Artstein condition or a bounded two-stage
+funnel:
+
+```bash
+python examples/minimal_workflows/quadratic_clf/vdp_global.py
+python examples/minimal_workflows/quadratic_clf/vdp_roa_dreal.py
+```
+
+The optional CROWN environment can run
+`examples/minimal_workflows/quadratic_clf/linear_roa_crown.py`.
