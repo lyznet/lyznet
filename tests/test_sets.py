@@ -95,3 +95,19 @@ def test_sets_are_immutable():
 
     with pytest.raises(AttributeError):
         box.bounds = ((0, 2),)
+
+
+def test_sublevel_set_uses_the_candidate_value_function():
+    class Candidate:
+        @staticmethod
+        def value(points):
+            return np.asarray(points)[..., 0] ** 2
+
+    sublevel = lz.SublevelSet(Candidate(), 1.0)
+
+    np.testing.assert_array_equal(
+        sublevel.contains(np.asarray([[-1.0], [0.0], [2.0]])),
+        np.asarray([True, True, False]),
+    )
+    with pytest.raises(ValueError, match="positive and finite"):
+        lz.SublevelSet(Candidate(), 0.0)

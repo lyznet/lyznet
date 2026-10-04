@@ -161,4 +161,30 @@ class WholeSpace:
         return np.ones(values.shape[:-1], dtype=bool)
 
 
-__all__ = ["Box", "EuclideanBall", "WholeSpace"]
+@dataclass(frozen=True)
+class SublevelSet:
+    """The closed set ``{x : certificate.value(x) <= level}``."""
+
+    certificate: object
+    level: float
+
+    def __post_init__(self):
+        if self.certificate is None:
+            raise ValueError("A sublevel set requires a certificate.")
+        if isinstance(self.level, (bool, str, bytes, complex)):
+            raise ValueError("A sublevel level must be positive and finite.")
+        try:
+            level = float(self.level)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                "A sublevel level must be positive and finite."
+            ) from error
+        if not np.isfinite(level) or level <= 0:
+            raise ValueError("A sublevel level must be positive and finite.")
+        object.__setattr__(self, "level", level)
+
+    def contains(self, points):
+        return self.certificate.value(points) <= self.level
+
+
+__all__ = ["Box", "EuclideanBall", "SublevelSet", "WholeSpace"]

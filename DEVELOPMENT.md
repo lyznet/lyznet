@@ -20,27 +20,25 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M04 — Z3 verification of quadratic Lyapunov sublevels
+### M05 — dReal verification of quadratic Lyapunov funnels
 
-Status: in progress
+Status: pending
 
-Objective: provide one auditable formal condition and a runnable minimal
-workflow for a quadratic Lyapunov sublevel on a polynomial system.
+Objective: migrate the two-stage dReal proof for nonlinear and
+nonpolynomial continuous-time systems.
 
 Acceptance criteria:
 
-- The mathematical violation queried by Z3 is visible in one core module.
-- An `unsat` result produces an immutable formal verification record.
-- The verifier searches for a level to precision `1e-4` by default.
-- The verified sublevel is strictly contained in the declared box.
-- A minimal Van der Pol script constructs, verifies, and reports the result.
-- Focused tests cover successful proof, counterexample, and invalid input.
+- The local contraction and outer annular-decrease conditions are explicit.
+- Numerical equilibria are handled without claiming they are exact.
+- dReal remains an optional dependency.
+- A minimal nonpolynomial example exercises the backend.
+- Focused tests distinguish verified, counterexample, and unknown outcomes.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M05 | dReal verification of quadratic Lyapunov funnels |
 | M06 | Optional CROWN verification of quadratic funnels |
 | M07 | Global and polynomial Lyapunov verification |
 | M08 | Quadratic control-Lyapunov verification |
@@ -80,3 +78,14 @@ Added system linearization and the numerically checked construction
 `A.T P + P A = -Q` for a Hurwitz linearization.
 
 Validation: `.venv/bin/python -m pytest -q` (`53 passed`).
+
+### M04 — Z3 verification of quadratic Lyapunov sublevels
+
+Added exact-rational Z3 conditions for positivity, strict sublevel decrease,
+and box-boundary exclusion, together with `find_lyapunov` and a runnable Van
+der Pol workflow.
+
+Validation:
+
+- `.venv/bin/python -m pytest -q` (`60 passed`)
+- `vdp_roa.py`: `VERIFIED`, level `2.3044`

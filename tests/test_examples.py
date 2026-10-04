@@ -21,3 +21,20 @@ def test_system_definition_example_runs():
     assert "ContinuousTimeSystem" in completed.stdout
     assert "ControlAffineSystem" in completed.stdout
     assert "f([1, 0]) = [ 0. -1.]" in completed.stdout
+
+
+def test_quadratic_verification_example_runs():
+    repository = Path(__file__).resolve().parents[1]
+    completed = subprocess.run(
+        [
+            sys.executable,
+            repository
+            / "examples/minimal_workflows/quadratic_lyapunov/vdp_roa.py",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Verified level: 2.3044" in completed.stdout
+    assert "Verification status: verified" in completed.stdout

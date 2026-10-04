@@ -12,12 +12,23 @@ The previous implementation is preserved in
 
 ## Current minimal workflow
 
-After installing the package with `python -m pip install -e '.[test]'`, run:
+Install the package with its test and Z3 extras:
+
+```bash
+python -m pip install -e '.[test,z3]'
+```
+
+To review system construction, run:
 
 ```bash
 python examples/minimal_workflows/system_definition/vdp.py
 ```
 
 This script defines autonomous and control-affine Van der Pol systems and
-evaluates their dynamics. Analysis and verification are added in later,
-separately reviewable stages.
+evaluates their dynamics.
+
+To construct and formally verify a quadratic Lyapunov sublevel, run:
+
+```bash
+python examples/minimal_workflows/quadratic_lyapunov/vdp_roa.py
+```
