@@ -38,3 +38,18 @@ To run the two-stage dReal proof for a nonpolynomial pendulum, run:
 ```bash
 python examples/minimal_workflows/quadratic_lyapunov/pendulum_roa.py
 ```
+
+The optional CROWN backend verifies proposed local and outer levels without
+vendoring alpha-beta-CROWN into LyZNet:
+
+```bash
+python -m pip install -e '.[crown]'
+python examples/minimal_workflows/quadratic_lyapunov/vdp_roa_crown.py
+```
+
+Install alpha-beta-CROWN 0.7 separately from its
+[upstream repository](https://github.com/Verified-Intelligence/alpha-beta-CROWN);
+LyZNet does not bundle the verifier.
+
+Automatic empirical proposal of CROWN levels belongs to the later screening
+stage; this minimal workflow states both proof levels explicitly.

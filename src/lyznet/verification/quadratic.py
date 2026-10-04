@@ -141,9 +141,11 @@ class _QuadraticProblem:
     principal_minors: tuple
     contraction_matrix: sp.ImmutableMatrix
     contraction_principal_minors: tuple
+    remainder_bound: sp.Expr | None
+    linear_decrease_matrix: sp.ImmutableMatrix | None
 
 
-def _build_problem(system, certificate):
+def _build_problem(system, certificate, *, include_crown=False):
     relative_states = sp.ImmutableMatrix(system.states)
     matrix = _freeze_matrix(certificate.matrix)
     centre = _freeze_matrix(certificate.centre)
@@ -179,6 +181,21 @@ def _build_problem(system, certificate):
         sp.expand(sp.det(negative_contraction[:size, :size]))
         for size in range(1, system.state_dimension + 1)
     )
+    if include_crown:
+        linearization = _freeze_matrix(certificate.linearization)
+        remainder = dynamics - linearization * relative_states
+        remainder_jacobian = remainder.jacobian(relative_states)
+        weighted_remainder = matrix * remainder_jacobian
+        symmetric_remainder = weighted_remainder + weighted_remainder.T
+        remainder_bound = sp.expand(sum(
+            entry**2 for entry in symmetric_remainder
+        ))
+        linear_decrease_matrix = -(
+            linearization.T * matrix + matrix * linearization
+        )
+    else:
+        remainder_bound = None
+        linear_decrease_matrix = None
     return _QuadraticProblem(
         states=tuple(relative_states),
         centre=tuple(centre),
@@ -188,6 +205,8 @@ def _build_problem(system, certificate):
         principal_minors=principal_minors,
         contraction_matrix=contraction_matrix,
         contraction_principal_minors=contraction_principal_minors,
+        remainder_bound=remainder_bound,
+        linear_decrease_matrix=linear_decrease_matrix,
     )
 
 
@@ -464,8 +483,18 @@ def verify_quadratic_roa(
     c2_search_precision=1e-4,
     local_max_level=None,
     jobs=1,
+    crown_device="auto",
+    crown_batch_size=64,
+    crown_proof_margin=1e-6,
+    crown_local_decrease_margin=1e-4,
+    crown_verbose=False,
 ):
-    """Find and formally verify a quadratic Lyapunov sublevel."""
+    """Find or verify a quadratic Lyapunov sublevel.
+
+    Z3 and dReal search their formal conditions to the requested precision.
+    CROWN instead verifies the two levels supplied as ``local_max_level`` and
+    ``maximum_level``; it does not spend formal queries on level search.
+    """
 
     if backend == "z3":
         return _verify_quadratic_roa_z3(
@@ -497,7 +526,33 @@ def verify_quadratic_roa(
             maximum_level=maximum_level,
             jobs=jobs,
         )
-    raise ValueError("backend must be 'z3' or 'dreal'.")
+    if backend == "crown":
+        if local_max_level is None or maximum_level is None:
+            raise ValueError(
+                "CROWN requires proposed local_max_level and maximum_level; "
+                "automatic empirical proposal is added in the screening "
+                "stage."
+            )
+        certificate = (
+            quadratic_lyapunov(system)
+            if certificate is None
+            else certificate
+        )
+        from .quadratic_crown import verify_quadratic_roa_crown
+
+        return verify_quadratic_roa_crown(
+            system,
+            certificate,
+            local_level=local_max_level,
+            outer_level=maximum_level,
+            timeout=timeout,
+            device=crown_device,
+            batch_size=crown_batch_size,
+            proof_margin=crown_proof_margin,
+            local_decrease_margin=crown_local_decrease_margin,
+            verbose=crown_verbose,
+        )
+    raise ValueError("backend must be 'z3', 'dreal', or 'crown'.")
 
 
 __all__ = [

@@ -1,4 +1,5 @@
 .venv/
+.venv-crown/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -8,3 +9,4 @@ build/
 dist/
 results/
 .DS_Store
+*.ses

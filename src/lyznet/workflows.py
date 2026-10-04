@@ -74,8 +74,10 @@ def find_lyapunov(
 
     if family != "quadratic":
         raise ValueError("This stage supports only family='quadratic'.")
-    if verify not in (None, False, "z3", "dreal"):
-        raise ValueError("verify must be None, False, 'z3', or 'dreal'.")
+    if verify not in (None, False, "z3", "dreal", "crown"):
+        raise ValueError(
+            "verify must be None, False, 'z3', 'dreal', or 'crown'."
+        )
     options = {} if verification_options is None else dict(verification_options)
 
     total_started = perf_counter()
@@ -85,7 +87,7 @@ def find_lyapunov(
 
     verification = None
     verification_time = 0.0
-    if verify in ("z3", "dreal"):
+    if verify in ("z3", "dreal", "crown"):
         verification_started = perf_counter()
         verification = verify_quadratic_roa(
             system,

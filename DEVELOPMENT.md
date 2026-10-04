@@ -20,28 +20,28 @@ The first public release is `0.1.0`.
 
 ## Current task
 
-### M06 — Optional CROWN verification of quadratic funnels
+### M07 — Global and polynomial Lyapunov verification
 
-Status: pending
+Status: in progress
 
-Objective: add an optional CROWN backend for the same two-stage quadratic
-funnel theorem without bundling alpha-beta-CROWN.
+Objective: migrate the compact global Lyapunov verification routes and the
+polynomial-certificate interface from `lyznet-dev`.
 
 Acceptance criteria:
 
-- The CROWN theorem and every bounded expression are visible in one core
-  module.
-- PyTorch and alpha-beta-CROWN remain optional external dependencies.
-- The backend requires an exact equilibrium and reports unsupported dynamics
-  explicitly.
-- A minimal polynomial example exercises the backend.
-- Focused tests cover verified and unsupported outcomes.
+- Global decrease and radial-unboundedness conditions remain visible in the
+  verification core.
+- Quadratic global verification reuses the symbolic global verifier where
+  the backend permits it.
+- Polynomial candidates have a small immutable public representation.
+- Synthesis output is independently verified before it is reported.
+- Minimal examples and focused tests exercise global quadratic and polynomial
+  verification.
 
 ## Queue
 
 | ID | Capability |
 |---|---|
-| M07 | Global and polynomial Lyapunov verification |
 | M08 | Quadratic control-Lyapunov verification |
 | M09 | Empirical screening and plotting |
 | M10 | Plain and anchored neural Lyapunov workflows |
@@ -101,3 +101,17 @@ Validation:
 
 - `.venv/bin/python -m pytest -q` (`72 passed`)
 - `pendulum_roa.py`: `VERIFIED`, local `1.7371`, outer `3.3332`
+
+### M06 — Optional CROWN verification of quadratic funnels
+
+Added an optional external alpha-beta-CROWN backend for directly proposed
+local and outer levels. The local proof bounds the nonlinear Jacobian
+remainder; the outer proof checks strict annular decrease.
+
+Validation:
+
+- Base environment: `.venv/bin/python -m pytest -q`
+  (`76 passed, 1 skipped`).
+- External CROWN environment: `python -m pytest -q`
+  (`77 passed`).
+- `vdp_roa_crown.py`: `VERIFIED`, local `0.4`, outer `2.3`.

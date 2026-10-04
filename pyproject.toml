@@ -22,6 +22,7 @@ dependencies = [
 test = ["pytest>=8"]
 z3 = ["z3-solver>=4.13"]
 dreal = ["dreal>=4.21.6.2"]
+crown = ["torch>=2.11,<2.12"]
 
 [project.urls]
 Repository = "https://github.com/lyznet/lyznet"
