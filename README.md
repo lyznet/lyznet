@@ -14,8 +14,10 @@ LyZNet 0.1.0 is tested with Python 3.11 on Linux.
 python -m pip install lyznet
 ```
 
-See the [installation guide](INSTALL.md) for optional dependencies, GPU
-support, dReal, and CROWN.
+See the [installation guide](INSTALL.md) for optional dependencies and GPU
+support, including
+[dReal](https://github.com/dreal/dreal4#how-to-install) and
+[α,β-CROWN (alpha-beta-CROWN)](https://github.com/Verified-Intelligence/alpha-beta-CROWN).
 
 ## Quick start
 
@@ -42,7 +44,8 @@ and uses Z3 to verify that its sublevel set `V(x) <= 2.3044` is a region of
 attraction within the specified domain.
 
 To learn a neural Lyapunov function from trajectory data and the Zubov PDE,
-then verify it with CROWN, use the same system:
+then verify it with α,β-CROWN through LyZNet's `crown` backend, use the same
+system:
 
 ```python
 lz.find_lyap(system, family="neural", verify="crown", plot=True).require_verified()

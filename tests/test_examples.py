@@ -6,6 +6,7 @@ import runpy
 import subprocess
 import sys
 
+import pytest
 import sympy as sp
 
 import lyznet as lz
@@ -29,6 +30,7 @@ def test_quadratic_verification_example_runs():
 
 
 def test_dreal_quadratic_example_runs():
+    pytest.importorskip("dreal")
     repository = Path(__file__).resolve().parents[1]
     completed = subprocess.run(
         [

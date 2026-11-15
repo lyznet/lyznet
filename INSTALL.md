@@ -44,11 +44,12 @@ Then install its Python binding:
 python -m pip install 'lyznet[dreal]'
 ```
 
-## CROWN
+## α,β-CROWN (alpha-beta-CROWN)
 
-Install alpha-beta-CROWN 0.7 by following its
+Install α,β-CROWN 0.7 by following its
 [installation guide](https://github.com/Verified-Intelligence/alpha-beta-CROWN).
-Then install LyZNet's matching Python dependencies:
+Then install LyZNet's matching Python dependencies. LyZNet exposes the
+verifier through its `crown` backend.
 
 ```bash
 python -m pip install 'lyznet[crown,plot]'
