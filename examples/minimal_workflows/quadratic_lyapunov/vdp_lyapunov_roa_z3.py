@@ -1,5 +1,7 @@
 """Find and formally verify a quadratic Lyapunov function with Z3."""
 
+from pathlib import Path
+
 import sympy as sp
 
 import lyznet as lz
@@ -14,9 +16,13 @@ system = lz.System.continuous(
 )
 
 if __name__ == "__main__":
-    result = lz.find_lyapunov(system, verify="z3")
+    result = lz.find_lyap(system, verify="z3")
     certificate = result.require_verified()
     print("Quadratic Lyapunov matrix:\n", certificate.candidate.matrix)
     print("Verified level:", certificate.verified_set.level)
     print("Verification status:", result.verification.status.value)
     print("Timings:", result.timings)
+    result.plot(
+        surface=True,
+        save=Path(__file__).parent / "results" / "vdp_roa_z3.pdf",
+    )

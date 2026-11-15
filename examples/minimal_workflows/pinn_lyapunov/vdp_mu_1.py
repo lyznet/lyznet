@@ -1,6 +1,4 @@
-"""Learn and verify a small anchored neural Lyapunov function."""
-
-from pathlib import Path
+"""Learn and verify a PINN Lyapunov function for Van der Pol, mu=1."""
 
 import sympy as sp
 
@@ -9,21 +7,19 @@ import lyznet as lz
 
 x1, x2 = sp.symbols("x1 x2")
 system = lz.System.continuous(
-    states=(x1, x2),
     dynamics=(-x2, x1 - (1 - x1**2) * x2),
     domain=((-2.5, 2.5), (-3.5, 3.5)),
-    name="van_der_pol_mu_1",
+    name="minimal_vdp_mu_1",
 )
 
+
 if __name__ == "__main__":
-    result = lz.find_lyapunov(
+    lz.find_lyap(
         system,
         family="neural",
         effort="low",
         verify="crown",
         plot=True,
-        results_dir=Path(__file__).parent / "results",
         learner_verbose=True,
         verifier_verbose=True,
-    )
-    result.require_verified()
+    ).require_verified()

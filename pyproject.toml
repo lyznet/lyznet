@@ -5,12 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lyznet"
 dynamic = ["version"]
-description = "Analysis, learning, and verification of dynamical systems"
+description = "Learning and formal verification of Lyapunov certificates"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     {name = "Jun Liu", email = "23146644+j49liu@users.noreply.github.com"},
+]
+keywords = [
+    "control",
+    "dynamical systems",
+    "formal verification",
+    "Lyapunov functions",
+    "neural networks",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
 ]
 dependencies = [
     "numpy>=1.26",
@@ -22,12 +39,14 @@ dependencies = [
 test = ["pytest>=8"]
 z3 = ["z3-solver>=4.13"]
 dreal = ["dreal>=4.21.6.2"]
+learning = ["torch>=2.11,<2.12"]
 crown = ["torch>=2.11,<2.12"]
 plot = ["matplotlib>=3.8"]
 
 [project.urls]
 Repository = "https://github.com/lyznet/lyznet"
 Issues = "https://github.com/lyznet/lyznet/issues"
+Changelog = "https://github.com/lyznet/lyznet/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]

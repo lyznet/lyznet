@@ -9,6 +9,9 @@ from .sets import RestrictedSublevelSet, SublevelSet
 from .systems import ControlAffineSystem
 
 
+_VERIFIED_COLOR = "#d55e00"
+
+
 def plot_lyapunov_result(
     result,
     *,
@@ -68,6 +71,9 @@ def plot_lyapunov_result(
     else:
         plotted_values = values
     style = {
+        "font.family": "serif",
+        "font.serif": ["STIXGeneral"],
+        "mathtext.fontset": "stix",
         "font.size": 15,
         "axes.labelsize": 17,
         "axes.titlesize": 18,
@@ -76,12 +82,16 @@ def plot_lyapunov_result(
         "legend.fontsize": 12,
     }
     with mpl.rc_context(style):
+        field_colormap = mpl.colors.LinearSegmentedColormap.from_list(
+            "lyznet_field",
+            mpl.colormaps["YlGnBu"](np.linspace(0.04, 0.66, 256)),
+        )
         if surface:
             figure = plt.figure(figsize=(12, 5))
             surface_axis = figure.add_subplot(1, 2, 1, projection="3d")
             axis = figure.add_subplot(1, 2, 2)
             surface_axis.plot_surface(
-                x1, x2, values, cmap="viridis", linewidth=0
+                x1, x2, values, cmap=field_colormap, linewidth=0
             )
             surface_axis.set(
                 xlabel=r"$x_1$",
@@ -92,9 +102,14 @@ def plot_lyapunov_result(
         else:
             figure, axis = plt.subplots(figsize=(6.5, 5.5))
 
-        axis.set_facecolor("0.82")
-        filled = axis.contourf(
-            x1, x2, plotted_values, levels=30, cmap="viridis", alpha=0.78
+        axis.set_facecolor("#eeeeee")
+        filled = axis.pcolormesh(
+            x1,
+            x2,
+            plotted_values,
+            cmap=field_colormap,
+            shading="auto",
+            rasterized=True,
         )
         figure.colorbar(filled, ax=axis, label=r"$V(x)$")
         if phase_portrait:
@@ -104,10 +119,9 @@ def plot_lyapunov_result(
                 second,
                 dynamics[:, 0].reshape(x1.shape),
                 dynamics[:, 1].reshape(x2.shape),
-                color="0.35",
-                density=0.9,
-                linewidth=0.7,
-                arrowsize=0.8,
+                color="#303030",
+                linewidth=0.75,
+                arrowsize=0.9,
             )
         local = (
             None
@@ -116,6 +130,7 @@ def plot_lyapunov_result(
         )
         verified = result.verified_set
         legend_handles = []
+        verified_legend_added = False
         set_types = (SublevelSet, RestrictedSublevelSet)
         finite_values = plotted_values.compressed() if np.ma.isMaskedArray(
             plotted_values
@@ -132,13 +147,22 @@ def plot_lyapunov_result(
                 plotted_values,
                 levels=[local.level],
                 colors=["white"],
+                linestyles=["-"],
+                linewidths=[3.2],
+            )
+            axis.contour(
+                x1,
+                x2,
+                plotted_values,
+                levels=[local.level],
+                colors=["black"],
                 linestyles=["--"],
                 linewidths=[1.8],
             )
             legend_handles.append(Line2D(
                 [0],
                 [0],
-                color="white",
+                color="black",
                 linestyle="--",
                 linewidth=1.8,
                 label="Local",
@@ -152,16 +176,18 @@ def plot_lyapunov_result(
                 x2,
                 plotted_values,
                 levels=[verified.level],
-                colors=["#c62828"],
+                colors=[_VERIFIED_COLOR],
                 linewidths=[2.6],
+                zorder=5,
             )
             legend_handles.append(Line2D(
                 [0],
                 [0],
-                color="#c62828",
+                color=_VERIFIED_COLOR,
                 linewidth=2.6,
                 label="Verified",
             ))
+            verified_legend_added = True
         if constraint_maximum is not None:
             axis.contour(
                 x1,
@@ -190,15 +216,21 @@ def plot_lyapunov_result(
                 viable_faces,
                 resolution=max(400, resolution),
             )
-            legend_handles.append(Line2D(
-                [0],
-                [0],
-                color="#1565c0",
-                linewidth=3.0,
-                label="Viable boundary",
-            ))
+            if not verified_legend_added:
+                legend_handles.append(Line2D(
+                    [0],
+                    [0],
+                    color=_VERIFIED_COLOR,
+                    linewidth=3.0,
+                    label="Verified",
+                ))
         if legend_handles:
-            axis.legend(handles=legend_handles, loc="best")
+            axis.legend(
+                handles=legend_handles,
+                loc="upper right",
+                framealpha=0.92,
+                edgecolor="none",
+            )
         axis.set(
             xlabel=r"$x_1$",
             ylabel=r"$x_2$",
@@ -248,8 +280,10 @@ def _plot_viable_faces(axis, result, viable_faces, resolution):
         axis.plot(
             np.ma.masked_where(~mask, horizontal),
             np.ma.masked_where(~mask, vertical),
-            color="#1565c0",
+            color=_VERIFIED_COLOR,
             linewidth=3.0,
+            clip_on=False,
+            zorder=6,
         )
 
 

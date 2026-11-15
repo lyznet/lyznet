@@ -1,80 +1,117 @@
-# LyZNet
+# LyZNet: Learning and formally verifying Lyapunov functions for nonlinear dynamical systems
 
-LyZNet supports the analysis, learning, and formal verification of
-certificates for dynamical systems.
+LyZNet is an open-source Python toolbox for constructing, learning, and
+formally verifying Lyapunov certificates and regions of attraction. It
+combines classical Lyapunov analysis, physics-informed neural networks,
+satisfiability modulo theories (SMT) solvers, and neural network verifiers to
+obtain rigorous stability certificates.
 
-This repository contains the new implementation and has not yet produced a
-public release. See [DEVELOPMENT.md](DEVELOPMENT.md) for the current task and
-release plan.
+## Installation
 
-The previous implementation is preserved in
-[lyznet-legacy](https://github.com/lyznet/lyznet-legacy).
-
-## Current minimal workflow
-
-Install the package with its test, Z3, and dReal extras:
+LyZNet 0.1.0 is tested with Python 3.11 on Linux.
 
 ```bash
-python -m pip install -e '.[test,z3,dreal]'
+python -m pip install lyznet
 ```
 
-To review system construction, run:
+See the [installation guide](INSTALL.md) for optional dependencies, GPU
+support, dReal, and CROWN.
 
-```bash
-python examples/minimal_workflows/system_definition/vdp.py
+## Quick start
+
+```python
+import sympy as sp
+import lyznet as lz
+
+x1, x2 = sp.symbols("x1 x2")
+system = lz.System.continuous(
+    dynamics=(-x2, x1 - (1 - x1**2) * x2),
+    domain=((-2.5, 2.5), (-3.5, 3.5)),
+)
+
+lz.find_lyap(system, verify="z3").require_verified()
 ```
 
-This script defines autonomous and control-affine Van der Pol systems and
-evaluates their dynamics.
+This constructs the quadratic Lyapunov function
 
-To construct and formally verify a quadratic Lyapunov sublevel, run:
-
-```bash
-python examples/minimal_workflows/quadratic_lyapunov/vdp_roa.py
+```text
+V(x) = 1.5 x1^2 - x1 x2 + x2^2
 ```
 
-To run the two-stage dReal proof for a nonpolynomial pendulum, run:
+and uses Z3 to verify that its sublevel set `V(x) <= 2.3044` is a region of
+attraction within the specified domain.
 
-```bash
-python examples/minimal_workflows/quadratic_lyapunov/pendulum_roa.py
+To learn a neural Lyapunov function from trajectory data and the Zubov PDE,
+then verify it with CROWN, use the same system:
+
+```python
+lz.find_lyap(system, family="neural", verify="crown", plot=True).require_verified()
 ```
 
-The optional CROWN backend uses empirical screening to propose local and outer
-levels, then verifies those fixed levels without formal bisection:
+See [`examples/minimal_workflows`](examples/minimal_workflows) for concise
+workflows and [`examples/reproductions`](examples/reproductions) for published
+results. The previous implementation is preserved in
+[lyznet-legacy](https://github.com/lyznet/lyznet-legacy) [1, 2].
 
-```bash
-python -m pip install -e '.[crown]'
-python examples/minimal_workflows/quadratic_lyapunov/vdp_roa_crown.py
+## References
+
+If you use LyZNet in your research, please consider citing the relevant
+papers:
+
+1. J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou, “LyZNet: A
+   Lightweight Python Tool for Learning and Verifying Neural Lyapunov
+   Functions and Regions of Attraction,” *Proceedings of the 27th ACM
+   International Conference on Hybrid Systems: Computation and Control
+   (HSCC)*, pp. 1–8, 2024.
+   [doi:10.1145/3641513.3650134](https://doi.org/10.1145/3641513.3650134)
+2. J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou, “Physics-Informed
+   Neural Network Lyapunov Functions: PDE Characterization, Learning, and
+   Verification,” *Automatica*, vol. 175, 112193, 2025.
+   [doi:10.1016/j.automatica.2025.112193](https://doi.org/10.1016/j.automatica.2025.112193)
+3. J. Liu, Y. Meng, M. Fitzsimmons, and R. Zhou, “Towards Learning and
+   Verifying Maximal Neural Lyapunov Functions,” *2023 62nd IEEE Conference
+   on Decision and Control (CDC)*, pp. 8012–8019, 2023.
+   [doi:10.1109/CDC49753.2023.10383299](https://doi.org/10.1109/CDC49753.2023.10383299)
+
+```bibtex
+@inproceedings{liu2024lyznet,
+  author={Liu, Jun and Meng, Yiming and Fitzsimmons, Maxwell and Zhou, Ruikun},
+  title={{LyZNet}: A Lightweight Python Tool for Learning and Verifying
+    Neural Lyapunov Functions and Regions of Attraction},
+  booktitle={Proceedings of the 27th ACM International Conference on
+    Hybrid Systems: Computation and Control},
+  pages={1--8},
+  year={2024},
+  publisher={ACM},
+  doi={10.1145/3641513.3650134}
+}
+
+@article{liu2025physics,
+  author={Liu, Jun and Meng, Yiming and Fitzsimmons, Maxwell and Zhou, Ruikun},
+  title={Physics-Informed Neural Network Lyapunov Functions: {PDE}
+    Characterization, Learning, and Verification},
+  journal={Automatica},
+  volume={175},
+  pages={112193},
+  year={2025},
+  doi={10.1016/j.automatica.2025.112193}
+}
+
+@inproceedings{liu2023towards,
+  author={Liu, Jun and Meng, Yiming and Fitzsimmons, Maxwell and Zhou, Ruikun},
+  title={Towards Learning and Verifying Maximal Neural Lyapunov Functions},
+  booktitle={2023 62nd IEEE Conference on Decision and Control ({CDC})},
+  pages={8012--8019},
+  year={2023},
+  publisher={IEEE},
+  doi={10.1109/CDC49753.2023.10383299}
+}
 ```
 
-Install alpha-beta-CROWN 0.7 separately from its
-[upstream repository](https://github.com/Verified-Intelligence/alpha-beta-CROWN);
-LyZNet does not bundle the verifier.
+## Contact
 
-The returned assessment records the sampled proposals as empirical evidence;
-only the subsequent CROWN obligations establish a formal result. Install the
-`plot` extra to save the example's PDF:
+Jun Liu — [j.liu@uwaterloo.ca](mailto:j.liu@uwaterloo.ca)
 
-```bash
-python -m pip install -e '.[plot]'
-```
+## License
 
-To prove global stability with a quadratic certificate, or synthesize and
-independently verify a polynomial certificate with Z3, run:
-
-```bash
-python examples/minimal_workflows/global_lyapunov/inverted_pendulum.py
-python examples/minimal_workflows/global_lyapunov/polynomial_z3.py
-```
-
-For a control-affine system, construct an LQR quadratic control-Lyapunov
-function and verify either a global Artstein condition or a bounded two-stage
-funnel:
-
-```bash
-python examples/minimal_workflows/quadratic_clf/vdp_global.py
-python examples/minimal_workflows/quadratic_clf/vdp_roa_dreal.py
-```
-
-The optional CROWN environment can run
-`examples/minimal_workflows/quadratic_clf/linear_roa_crown.py`.
+LyZNet is released under the [Apache License 2.0](LICENSE).

@@ -23,6 +23,16 @@ def normalise_state_constraints(system, state_constraints):
 
 
 def normalise_viable_faces(system, viable_faces):
+    if isinstance(viable_faces, str):
+        if viable_faces != "all":
+            raise ValueError(
+                "viable_faces must be 'all' or a sequence of faces."
+            )
+        return tuple(
+            (coordinate, side)
+            for coordinate in range(system.state_dimension)
+            for side in ("lower", "upper")
+        )
     result = []
     for face in viable_faces:
         if len(face) != 2:

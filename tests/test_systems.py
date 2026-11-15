@@ -32,6 +32,18 @@ def test_continuous_system_preserves_symbolic_and_numpy_views():
     assert single.dtype == np.float32
 
 
+def test_continuous_system_infers_conventionally_named_states():
+    states = sp.symbols("x1:11")
+    system = lz.System.continuous(
+        dynamics=tuple(-state for state in states)
+    )
+
+    assert system.states == states
+
+    with pytest.raises(ValueError, match="pass states explicitly"):
+        lz.System.continuous(dynamics=(-states[0], -states[-1]))
+
+
 def test_system_rejects_undeclared_symbols_and_false_equilibria():
     x, y = sp.symbols("x y")
 

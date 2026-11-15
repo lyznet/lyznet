@@ -5,6 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 from .analysis import (
     QuadraticControlLyapunov,
     QuadraticLyapunov,
+    homogeneous_degree,
     linearize,
     quadratic_control_lyapunov,
     quadratic_lyapunov,
@@ -17,6 +18,7 @@ from .assessment import (
 )
 from .certificates import PolynomialLyapunov
 from .equilibria import NumericalEquilibrium, solve_equilibrium
+from .neural_options import PINNCorrectionStage
 from .sets import (
     Box,
     EuclideanBall,
@@ -69,6 +71,7 @@ __all__ = [
     "LyapunovSearchTimings",
     "NumericalEquilibrium",
     "OptionalVerificationDependencyError",
+    "PINNCorrectionStage",
     "PolynomialLyapunov",
     "PolynomialLyapunovSynthesisResult",
     "QuadraticControlLyapunov",
@@ -89,6 +92,7 @@ __all__ = [
     "find_lyap",
     "find_control_lyapunov",
     "find_lyapunov",
+    "homogeneous_degree",
     "linearize",
     "quadratic_lyapunov",
     "quadratic_control_lyapunov",

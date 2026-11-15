@@ -112,3 +112,26 @@ def test_constructor_rejects_a_bad_solver_residual(monkeypatch):
 
     with pytest.raises(ValueError, match="Lyapunov equation residual"):
         lz.quadratic_lyapunov(stable_van_der_pol())
+
+
+def test_homogeneous_degree_is_exact_for_polynomial_and_radical_fields():
+    x1, x2 = sp.symbols("x1 x2")
+    polynomial = lz.System.continuous(
+        states=(x1, x2),
+        dynamics=(x1**3 + x1*x2**2, -x2**3),
+    )
+    radical = lz.System.continuous(
+        states=(x1, x2),
+        dynamics=(
+            -x1 * sp.sqrt(x1**2 + x2**2),
+            -x2 * sp.sqrt(x1**2 + x2**2),
+        ),
+    )
+    nonhomogeneous = lz.System.continuous(
+        states=(x1, x2),
+        dynamics=(-x1 - x1**3, -x2),
+    )
+
+    assert lz.homogeneous_degree(polynomial) == 3
+    assert lz.homogeneous_degree(radical) == 2
+    assert lz.homogeneous_degree(nonhomogeneous) is None

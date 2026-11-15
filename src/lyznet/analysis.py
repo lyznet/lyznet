@@ -9,6 +9,41 @@ import sympy as sp
 from .systems import ControlAffineSystem
 
 
+def homogeneous_degree(system):
+    """Return the exact ordinary degree of a homogeneous vector field.
+
+    Zero components impose no degree. The positive scale symbol lets SymPy
+    simplify radicals such as ``sqrt(scale**6 * p(x))`` without introducing
+    an absolute value.
+    """
+
+    if isinstance(system, ControlAffineSystem):
+        raise TypeError("homogeneous_degree requires an autonomous system.")
+    scale = sp.Symbol("_homogeneity_scale", positive=True)
+    substitutions = {
+        state: scale * state for state in system.states
+    }
+    common_degree = None
+    for expression in system.symbolic.dynamics:
+        expression = sp.sympify(expression)
+        if expression == 0:
+            continue
+        scaled = expression.subs(substitutions, simultaneous=True)
+        ratio = sp.powsimp(
+            sp.powdenest(sp.simplify(scaled / expression), force=True),
+            force=True,
+        )
+        powers = ratio.as_powers_dict()
+        degree = sp.simplify(powers.get(scale, 0))
+        if degree.free_symbols or sp.simplify(ratio - scale**degree) != 0:
+            return None
+        if common_degree is None:
+            common_degree = degree
+        elif sp.simplify(degree - common_degree) != 0:
+            return None
+    return common_degree
+
+
 def _real_finite_array(value, label):
     """Return a copied real floating-point array without lossy conversion."""
 
@@ -399,6 +434,7 @@ def quadratic_control_lyapunov(system, q_matrix=None, r_matrix=None):
 
 
 __all__ = [
+    "homogeneous_degree",
     "QuadraticControlLyapunov",
     "QuadraticLyapunov",
     "linearize",

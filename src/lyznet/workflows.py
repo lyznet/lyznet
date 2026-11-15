@@ -1,6 +1,8 @@
 """Small user-facing workflows composed from analysis and verification."""
 
+import __main__
 from dataclasses import dataclass
+from pathlib import Path
 from time import perf_counter
 
 from .analysis import (
@@ -31,6 +33,15 @@ class VerifiedLyapunovCertificate:
     local_set: SublevelSet | None
     verified_set: object
     verification: object
+
+
+def _default_results_directory():
+    """Place artifacts beside a directly executed Python script."""
+
+    main_file = getattr(__main__, "__file__", None)
+    if main_file is not None and Path(main_file).suffix == ".py":
+        return Path(main_file).expanduser().resolve().parent / "results"
+    return Path.cwd() / "results"
 
 
 @dataclass(frozen=True)
@@ -99,9 +110,9 @@ def find_lyapunov(
     terms=None,
     search_options=None,
     architecture="anchored",
-    effort="low",
+    effort=None,
     device="auto",
-    results_dir="results",
+    results_dir=None,
     seed=20260823,
     data_overwrite=False,
     model_overwrite=False,
@@ -118,9 +129,40 @@ def find_lyapunov(
 
     Neural state constraints use ``h_i(x) <= 1``. A viable box face is named
     by a zero-based coordinate and ``"lower"`` or ``"upper"``; every other
-    face must remain separated from the verified sublevel.
+    face must remain separated from the verified sublevel. Set
+    ``viable_faces="all"`` to check strict inward flow on every box face.
+
+    For neural candidates, an omitted effort selects the built-in low recipe
+    unless explicit learner options define one fixed recipe. Explicit mid and
+    high efforts retain and compare cumulative checkpoints. An omitted
+    ``results_dir`` stores artifacts in ``results/`` beside a directly
+    executed script, or below the current directory in interactive sessions.
     """
 
+    if results_dir is None:
+        results_dir = _default_results_directory()
+
+    if family == "neural" and architecture == "homogeneous":
+        from .homogeneous_workflow import find_homogeneous_neural_lyapunov
+
+        return find_homogeneous_neural_lyapunov(
+            system,
+            search=search,
+            scope=scope,
+            verify=verify,
+            results_dir=results_dir,
+            model_overwrite=model_overwrite,
+            data_options=data_options,
+            data_overwrite=data_overwrite,
+            learner_options=learner_options,
+            verification_options=verification_options,
+            learner_verbose=learner_verbose,
+            verifier_verbose=verifier_verbose,
+            plot=plot,
+            plot_options=plot_options,
+            state_constraints=state_constraints,
+            viable_faces=viable_faces,
+        )
     if family == "neural":
         if scope != "roa":
             raise ValueError("Neural Lyapunov learning currently uses scope='roa'.")

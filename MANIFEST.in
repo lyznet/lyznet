@@ -1,0 +1,11 @@
+include CHANGELOG.md
+include INSTALL.md
+recursive-include examples *.md *.py
+recursive-include tools *.py
+exclude .gitignore
+exclude AGENTS.md
+exclude CLAUDE.md
+exclude DEVELOPMENT.md
+prune .github
+global-exclude *.py[cod]
+global-exclude __pycache__

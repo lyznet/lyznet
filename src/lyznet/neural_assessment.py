@@ -3,6 +3,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_FLOOR
+import math
 
 import numpy as np
 import sympy as sp
@@ -37,6 +38,14 @@ def _floor(value, precision):
     return float(
         (value / quantum).to_integral_value(rounding=ROUND_FLOOR) * quantum
     )
+
+
+def _conservative_level(raw_level, cap, precision, floor):
+    """Round below a sampled failure level with a small visible margin."""
+
+    raw_level = min(float(raw_level), float(cap))
+    safety = max(4 * precision, 0.01 * max(abs(raw_level), precision))
+    return max(floor, _floor(raw_level - safety, precision))
 
 
 def _candidate_values(candidate, points, batch_size):
@@ -80,6 +89,8 @@ def screen_neural_lyapunov(
     device="auto",
     precision=1e-4,
     proof_margin=1e-6,
+    local_max_level=0.3,
+    maximum_level=1.0,
     batch_size=4096,
     state_constraints=(),
     viable_faces=(),
@@ -144,10 +155,26 @@ def screen_neural_lyapunov(
     if not bool(outside_bootstrap.any()):
         raise RuntimeError("Screening did not sample outside the quadratic core.")
     containment_limit = float(values[outside_bootstrap].min().cpu())
-    local_level = _floor(
-        max(precision, 0.9 * containment_limit), precision
+    if candidate.architecture == "anchored":
+        with torch.no_grad():
+            correction = (
+                model.model(points) - model.centre_output
+            ).reshape(-1)
+            correction_minimum = min(
+                0.0, float(correction.min().cpu())
+            )
+            anchored_limit = math.tanh(
+                float(model.scale.detach().cpu())
+                * (quadratic_set.level - proof_margin)
+                * math.exp(correction_minimum)
+            )
+        containment_limit = min(containment_limit, anchored_limit)
+    local_level = _conservative_level(
+        containment_limit,
+        local_max_level,
+        precision,
+        precision,
     )
-    local_level = max(precision, local_level)
 
     bad_decrease = (
         admissible
@@ -224,10 +251,14 @@ def screen_neural_lyapunov(
         boundary_limit,
         float("inf") if decrease_limit is None else decrease_limit,
         float("inf") if constraint_limit is None else constraint_limit,
-        1.0 if candidate.architecture == "anchored" else float("inf"),
+        maximum_level,
     )
-    outer_level = _floor(max(local_level, 0.9 * observed_outer), precision)
-    outer_level = max(local_level, outer_level)
+    outer_level = _conservative_level(
+        observed_outer,
+        maximum_level,
+        precision,
+        local_level,
+    )
     if candidate.architecture == "anchored":
         outer_level = min(outer_level, _floor(1 - 10 * precision, precision))
     fraction = float(

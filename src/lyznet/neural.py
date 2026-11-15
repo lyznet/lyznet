@@ -50,7 +50,15 @@ def _fingerprint(module, description):
 class TanhNetwork(nn.Module):
     """A scalar tanh MLP with an explicit input gradient."""
 
-    def __init__(self, state_dimension, hidden_layers=2, width=20):
+    def __init__(
+        self,
+        state_dimension,
+        hidden_layers=2,
+        width=20,
+        *,
+        device=None,
+        dtype=None,
+    ):
         super().__init__()
         self.state_dimension = _positive_integer(
             state_dimension, "state_dimension"
@@ -64,10 +72,17 @@ class TanhNetwork(nn.Module):
             *((self.width, self.width),) * (self.hidden_layers - 1),
         )
         self.layers = nn.ModuleList(
-            nn.Linear(input_width, output_width)
+            nn.Linear(
+                input_width,
+                output_width,
+                device=device,
+                dtype=dtype,
+            )
             for input_width, output_width in dimensions
         )
-        self.output_layer = nn.Linear(self.width, 1)
+        self.output_layer = nn.Linear(
+            self.width, 1, device=device, dtype=dtype
+        )
 
     def forward(self, states):
         hidden = states
@@ -247,8 +262,76 @@ class QuadraticAnchoredNeuralLyapunov(nn.Module):
         )
 
 
+class HomogeneousNeuralLyapunov(nn.Module):
+    r"""The positive homogeneous function
+
+    ``V(x)=||x||^p exp(N(x/||x||))``, with ``V(0)=0``.
+
+    The neural network represents only the angular log shape. Positivity and
+    degree-``p`` homogeneity therefore hold by construction away from the
+    origin; formal verification must still establish strict decrease.
+    """
+
+    architecture = "homogeneous"
+
+    def __init__(self, model, degree=1):
+        super().__init__()
+        if type(model) is not TanhNetwork:
+            raise TypeError("model must be exactly a TanhNetwork.")
+        self.degree = _positive_integer(degree, "degree")
+        self.state_dimension = model.state_dimension
+        model = deepcopy(model).eval()
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+        self.model = model
+
+    def value_and_gradient(self, states):
+        norm = torch.linalg.vector_norm(states, dim=1, keepdim=True)
+        safe_norm = norm.clamp_min(torch.finfo(states.dtype).tiny)
+        directions = states / safe_norm
+        log_shape, angular_gradient = self.model.value_and_gradient(
+            directions
+        )
+        values = norm.pow(self.degree) * torch.exp(log_shape)
+        radial = self.degree * directions
+        tangent = angular_gradient - torch.sum(
+            angular_gradient * directions, dim=1, keepdim=True
+        ) * directions
+        gradients = values / safe_norm * (radial + tangent)
+        gradients = torch.where(norm > 0, gradients, torch.zeros_like(gradients))
+        return values, gradients
+
+    def forward(self, states):
+        values, _ = self.value_and_gradient(states)
+        return values
+
+    def value(self, points):
+        values = _numpy_points(points, self.state_dimension)
+        dtype, device = _dtype_and_device(self.model)
+        inputs = torch.as_tensor(
+            values.reshape(-1, self.state_dimension),
+            dtype=dtype,
+            device=device,
+        )
+        with torch.no_grad():
+            output = self(inputs).reshape(values.shape[:-1])
+        return output.cpu().numpy()
+
+    def proof_fingerprint(self):
+        return _fingerprint(
+            self,
+            (
+                type(self).__qualname__,
+                self.state_dimension,
+                self.architecture,
+                self.degree,
+            ),
+        )
+
+
 __all__ = [
     "CenteredNeuralLyapunov",
+    "HomogeneousNeuralLyapunov",
     "QuadraticAnchoredNeuralLyapunov",
     "TanhNetwork",
 ]

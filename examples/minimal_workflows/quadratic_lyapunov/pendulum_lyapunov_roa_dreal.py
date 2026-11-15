@@ -1,5 +1,7 @@
 """Verify a quadratic Lyapunov funnel for a nonlinear pendulum with dReal."""
 
+from pathlib import Path
+
 import sympy as sp
 
 import lyznet as lz
@@ -21,3 +23,7 @@ if __name__ == "__main__":
     print("Verified outer level:", certificate.verified_set.level)
     print("Formal claim:", result.verification.claim.value)
     print("Timings:", result.timings)
+    result.plot(
+        surface=True,
+        save=Path(__file__).parent / "results" / "pendulum_roa_dreal.pdf",
+    )

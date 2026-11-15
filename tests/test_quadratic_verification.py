@@ -59,7 +59,7 @@ def test_z3_rejects_a_candidate_without_strict_decrease():
 
 
 def test_workflow_returns_only_formally_verified_certificate():
-    result = lz.find_lyapunov(stable_van_der_pol(), verify="z3")
+    result = lz.find_lyap(stable_van_der_pol(), verify="z3")
     certificate = result.require_verified()
 
     assert result.is_verified

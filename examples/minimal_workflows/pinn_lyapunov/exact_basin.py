@@ -1,4 +1,4 @@
-"""Verify a neural Lyapunov set whose boundary includes a state constraint."""
+"""Learn and verify an anchored PINN Lyapunov function for a known basin."""
 
 from pathlib import Path
 
@@ -10,19 +10,20 @@ import lyznet as lz
 x1, x2 = sp.symbols("x1 x2")
 system = lz.System.continuous(
     states=(x1, x2),
-    dynamics=(-x1, -x2),
-    domain=((-1.0, 1.0),) * 2,
-    name="stable_linear_disk_constraint",
+    dynamics=(-x1 + 2 * x1**2 * x2, -x2),
+    domain=((-3.0, 3.0),) * 2,
+    name="minimal_neural_exact_basin",
 )
 
+
 if __name__ == "__main__":
-    result = lz.find_lyapunov(
+    result = lz.find_lyap(
         system,
         family="neural",
         verify="crown",
-        state_constraints=(sp.Rational(25, 36) * (x1**2 + x2**2),),
-        viable_faces=((0, "lower"), (0, "upper"),
-                      (1, "lower"), (1, "upper")),
+        effort="mid",
+        seed=123,
+        data_options={"transform_mu": 0.33},
         plot=True,
         results_dir=Path(__file__).parent / "results",
         learner_verbose=True,

@@ -1,5 +1,7 @@
 """Canonical continuous-time system definitions and numerical views."""
 
+import re
+
 import numpy as np
 import sympy as sp
 
@@ -51,6 +53,35 @@ def _normalise_symbols(symbols, label):
     if len(set(values)) != len(values):
         raise ValueError("{} must not contain duplicate symbols.".format(label))
     return values
+
+
+def _infer_states(dynamics):
+    """Infer an unambiguous conventional state sequence from dynamics."""
+
+    expressions = tuple(sp.sympify(value) for value in list(sp.Matrix(dynamics)))
+    symbols = set().union(*(expression.free_symbols for expression in expressions))
+    if len(symbols) != len(expressions):
+        raise ValueError(
+            "Cannot infer states: dynamics must contain exactly one distinct "
+            "state symbol per equation; pass states explicitly."
+        )
+    if len(symbols) == 1:
+        return tuple(symbols)
+
+    indexed = []
+    for symbol in symbols:
+        match = re.fullmatch(r"(.*?)(\d+)", symbol.name)
+        if match is None:
+            raise ValueError(
+                "Cannot infer state order; pass states explicitly."
+            )
+        indexed.append((match.group(1), int(match.group(2)), symbol))
+    prefixes = {prefix for prefix, _, _ in indexed}
+    indices = sorted(index for _, index, _ in indexed)
+    expected = list(range(indices[0], indices[0] + len(indices)))
+    if len(prefixes) != 1 or indices != expected or indices[0] not in (0, 1):
+        raise ValueError("Cannot infer state order; pass states explicitly.")
+    return tuple(symbol for _, _, symbol in sorted(indexed, key=lambda item: item[1]))
 
 
 def _normalise_vector(expressions, expected_size, label):
@@ -359,7 +390,11 @@ class _ControlNumpyView(_ReadOnly):
 class ContinuousTimeSystem(System):
     """An autonomous continuous-time system ``x_dot = f(x)``."""
 
-    def __init__(self, *, states, dynamics, domain=None, equilibrium=None, name=""):
+    def __init__(
+        self, *, dynamics, states=None, domain=None, equilibrium=None, name=""
+    ):
+        if states is None:
+            states = _infer_states(dynamics)
         self.states = _normalise_symbols(states, "states")
         expressions = _normalise_vector(dynamics, len(self.states), "dynamics")
         _validate_free_symbols(expressions, set(self.states), "dynamics")
